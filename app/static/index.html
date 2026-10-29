@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F1ECE4">
+<title>Kreola Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top" id="top" hidden><div class="wrap">
+  <div class="brand">KREOLA<span class="long"> <span>/</span> REVIEW</span></div>
+  <nav class="nav">
+    <a href="#/" data-nav="overview">Overview</a>
+    <a href="#/review" data-nav="review">Review</a>
+    <a href="#/learning" data-nav="learning">Learning</a>
+  </nav>
+  <div class="pill" id="pill"></div>
+</div></header>
+
+<main class="wrap" id="main"></main>
+
+<div class="scrim" id="scrim"></div>
+<div class="wc" id="wc" role="dialog" aria-label="Word">
+  <div class="top2">
+    <button class="hearbtn" id="wchear" aria-label="Hear this word"><svg width="14" height="14" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg></button>
+    <div><b id="wcword"></b><br><small id="wcwhen"></small></div>
+    <button class="x" id="wcx" aria-label="Close">✕</button>
+  </div>
+
+  <div class="part">
+    <label for="wcin">1 · Correct word</label>
+    <div class="field main"><input id="wcin" autocomplete="off" spellcheck="false" placeholder="Type the right word(s)"></div>
+  </div>
+
+  <div class="part">
+    <label for="wcq">2 · Find a word</label>
+    <div class="seg" id="wclang"><button data-l="mfe" class="on">Kreol</button><button data-l="fr">French</button><button data-l="en">English</button></div>
+    <div class="field" style="margin-top:10px"><input id="wcq" autocomplete="off" placeholder="A word, a meaning or what you hear"><button class="btn primary small" id="wcask">Ask</button></div>
+    <div class="hits" id="wchits"></div>
+    <div class="opts" id="wcopts"></div>
+    <div class="status" id="wcstatus"></div>
+  </div>
+
+  <div class="part">
+    <label for="wcnote">3 · Comment</label>
+    <div class="chips" id="wcchips"></div>
+    <div class="field" style="margin-top:10px"><input id="wcnote" placeholder="Type a comment">
+      <button class="mic" id="wcmic" title="Record a voice note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button></div>
+    <div id="wcvoice"></div>
+  </div>
+
+  <button class="rm" id="wcrm">Remove this word (not said)</button>
+  <div class="row"><button class="btn ghost" id="wccancel">Cancel</button><button class="btn primary" id="wcsave">Save</button></div>
+</div>
+
+<div class="toast" id="toast"><span class="ok">✓</span><span id="toastT"></span></div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# tools/ (run once on the PC with the Kreola dataset, not on the server)
+-r requirements.txt
+numpy
+openpyxl
+wordfreq
+num2words
+requests
+soundfile
