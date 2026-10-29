@@ -29,7 +29,10 @@ async def login_required(request: Request, call_next):
     p = request.url.path
     if PASSWORD and p.startswith("/api/") and p not in ("/api/login", "/api/me") and not request.session.get("ok"):
         return JSONResponse({"detail": "login"}, status_code=401)
-    return await call_next(request)
+    response = await call_next(request)
+    if not p.startswith("/api/"):  # the page, script and styles: always check for a newer version (cheap 304 if unchanged)
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, max_age=60 * 60 * 24 * 30, same_site="lax", https_only=HOSTED)

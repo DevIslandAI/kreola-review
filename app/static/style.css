@@ -133,6 +133,28 @@ a.upnext:active{transform:scale(.985)}
 .catbar{display:flex;align-items:center;gap:20px;padding:18px 24px}
 .tag{font-size:.84rem;color:var(--sage-d);font-weight:500}
 .list{margin-top:12px}
+/* recording rows: title, then aligned columns for language, difficulty, clip progress and length */
+.lhead,.row{display:grid;grid-template-columns:26px minmax(0,1fr) 170px 92px 130px 52px;gap:16px;align-items:center}
+.lhead{padding:0 12px 8px;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3)}
+.lhead span:last-child,.row .d{text-align:right}
+.row{padding:13px 12px;border-radius:14px;text-decoration:none;color:inherit;transition:background .15s}
+.row:hover{background:rgba(255,255,255,.75)}
+.row+.row{border-top:1px solid var(--line)}
+.row .t{font-weight:500;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .d{font-size:.84rem;color:var(--ink2);font-variant-numeric:tabular-nums}
+.langs{display:flex;gap:5px;flex-wrap:wrap}
+.lp{font-size:.72rem;font-weight:500;padding:3px 9px;border-radius:999px;line-height:1.4}
+.lp.mfe{background:#E3EAE3;color:#4F6B55}.lp.fra{background:#EFE6DA;color:#7A5A34}.lp.eng{background:#E4E6EC;color:#4E566B}
+.dp{justify-self:start;font-size:.72rem;font-weight:500;padding:3px 10px 3px 8px;border-radius:999px;display:inline-flex;align-items:center;gap:6px}
+.dp::before{content:"";width:6px;height:6px;border-radius:50%}
+.dp.hard{background:#F1E5D6;color:#8A6436}.dp.hard::before{background:#C49A6C}
+.dp.typ{background:#ECE8E1;color:var(--ink2)}.dp.typ::before{background:var(--moss)}
+.dp.easy{background:#E4ECE4;color:#4F6B55}.dp.easy::before{background:var(--sage)}
+.cl{display:flex;align-items:center;gap:8px}
+.segs{display:flex;gap:3px;flex:1;max-width:84px}
+.segs i{flex:1;height:6px;border-radius:3px;background:#E3DDD3}
+.segs i.on{background:var(--sage)}
+.cn{font-size:.78rem;color:var(--ink2);font-variant-numeric:tabular-nums;min-width:28px}
 .item{display:grid;grid-template-columns:26px 1fr auto;gap:16px;align-items:center;padding:14px 10px;border-radius:14px;transition:background .15s;cursor:pointer;text-decoration:none;color:inherit}
 .item:hover{background:rgba(255,255,255,.7)}
 .item+.item{border-top:1px solid var(--line)}
@@ -304,6 +326,12 @@ td.n{text-align:right;color:var(--ink2);font-variant-numeric:tabular-nums}
   .upnext .go{display:none}
   .rowbar{grid-template-columns:96px 1fr 66px;gap:10px}
   .tiles{grid-template-columns:1fr 1fr;gap:10px}
+  /* rows on a phone: title (and length) on top, then language, difficulty and clip progress on one line */
+  .lhead{display:none}
+  .row{grid-template-columns:24px auto auto minmax(0,1fr) auto;grid-template-areas:"st t t t d" "st langs dp cl cl";gap:8px 10px;padding:12px 6px}
+  .row .st{grid-area:st;align-self:start;margin-top:1px}.row .t{grid-area:t}.row .d{grid-area:d}
+  .row .langs{grid-area:langs}.row .dp{grid-area:dp}.row .cl{grid-area:cl;justify-content:flex-end}
+  .segs{max-width:70px}
   .tile{padding:14px}
   .catbar{flex-direction:column;align-items:stretch;gap:14px;padding:18px}
   .flow{grid-template-columns:1fr}.flow .arr{transform:rotate(90deg);justify-self:center}

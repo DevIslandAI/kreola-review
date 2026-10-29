@@ -7,7 +7,7 @@ const phone = () => matchMedia('(max-width:720px)').matches;
 const LANG = {mfe_Latn: 'Kreol', fra_Latn: 'French', eng_Latn: 'English'};
 const DIFF = {hard: 'Hard', typ: 'Typical', easy: 'Easy'};
 const nice = s => { s = String(s).replace(/_/g, ' '); return s[0].toUpperCase() + s.slice(1); };
-const langs = e => (e.languages || [e.language]).map(l => LANG[l] || l).join(' + ');
+const langs = e => ['mfe_Latn', 'fra_Latn', 'eng_Latn'].filter(l => (e.languages || [e.language]).includes(l)).map(l => LANG[l]).join(' + ');
 const WORD_WHY = ['Misheard', 'Spelling', 'Can’t hear', 'Wrong language', 'Timing off'];
 const CLIP_WHY = ['Can’t hear', 'Timing off', 'Wrong language', 'Music behind', 'Several speakers'];
 
@@ -135,9 +135,15 @@ async function category(cat) {
 }
 function list(cat) {
   const all = OV.excerpts.filter(e => e.category === cat && (filter === 'all' || e.status === filter));
-  $('#list').innerHTML = all.slice(0, shown).map(e => `<a class="item" href="#/r/${encodeURIComponent(e.id)}">
+  const pills = e => ['mfe_Latn', 'fra_Latn', 'eng_Latn'].filter(l => (e.languages || [e.language]).includes(l)).map(l => `<span class="lp ${l.slice(0, 3)}">${LANG[l] || l}</span>`).join('');
+  const segs = e => Array.from({length: e.clips}, (_, i) => `<i class="${i < e.done ? 'on' : ''}"></i>`).join('');
+  $('#list').innerHTML = (all.length ? `<div class="lhead"><span></span><span>Recording</span><span>Language</span><span>Difficulty</span><span>Clips</span><span>Length</span></div>` : '')
+    + all.slice(0, shown).map(e => `<a class="row" href="#/r/${encodeURIComponent(e.id)}">
     <span class="st ${e.status}">${e.status === 'done' ? '✓' : ''}</span>
-    <div><div class="t">${esc(e.title)}</div><div class="meta"><span>${e.done}/${e.clips} clips</span><i></i><span><span class="dot ${e.difficulty}"></span>${DIFF[e.difficulty]}</span><i></i><span>${langs(e)}</span></div></div>
+    <span class="t" title="${esc(e.title)}">${esc(e.title)}</span>
+    <span class="langs">${pills(e)}</span>
+    <span class="dp ${e.difficulty}">${DIFF[e.difficulty]}</span>
+    <span class="cl"><span class="segs">${segs(e)}</span><span class="cn">${e.done}/${e.clips}</span></span>
     <span class="d">${fmt(e.duration)}</span></a>`).join('') || '<p class="empty">Nothing here yet.</p>';
   $('#more').innerHTML = all.length > shown ? `<button class="btn ghost small">Show more (${all.length - shown})</button>` : '';
   if (all.length > shown) $('#more button').onclick = () => { shown += 60; list(cat); };
