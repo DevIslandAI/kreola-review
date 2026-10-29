@@ -178,8 +178,8 @@ async function review(id, start) {
   cur = start || (first < 0 ? 0 : first);
   $('#main').innerHTML = `<section class="screen">
   <div class="rvbar" id="rvbar">
-    <a class="back" href="#/c/${encodeURIComponent(EX.category)}" title="Back to ${nice(EX.category)}"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${nice(EX.category)}</span></a>
-    <div class="rvt" title="${esc(EX.title)}"><b>${esc(EX.title)}</b><span class="meta"><span>${fmt(EX.duration)}</span><i></i><span><span class="dot ${EX.difficulty}"></span>${DIFF[EX.difficulty]}</span><i></i><span>${langs(EX)}</span></span></div>
+    <a class="back" href="#/c/${encodeURIComponent(EX.category)}" title="Back to ${nice(EX.category)}"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span></a>
+    <span class="grow"></span>
     <div class="rvnav"><button class="nb" id="prevc" aria-label="Previous clip" title="Previous clip (←)">‹</button><span id="clipno"></span><button class="nb" id="nextc" aria-label="Next clip" title="Next clip (→)">›</button></div>
     <button class="btn quiet helpbtn" id="helpbtn" title="Translate / find a word"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h8M8 3v2M6 5c0 4 2 7 6 9M10 5c0 3-2 6-6 8"/><path d="m13 21 4-9 4 9M14.5 18h5"/></svg><span class="tw">Translate</span></button>
     <button class="btn quiet" id="skip">Skip</button>
@@ -208,6 +208,8 @@ function load(i) {
   closeCard(); stopAudio(); flushTime(); cur = i;
   if (i >= EX.clips.length) return finished();
   $('#clipcard').innerHTML = `
+    <div class="extitle" title="${esc(EX.title)}"><span class="et">${esc(EX.title)}</span>
+      <span class="meta"><span>${nice(EX.category)}</span><i></i><span>${fmt(EX.duration)}</span><i></i><span><span class="dot ${EX.difficulty}"></span>${DIFF[EX.difficulty]}</span><i></i><span>${langs(EX)}</span></span></div>
     <div class="player"><button class="play" id="play" aria-label="Play clip"><svg id="pi" width="20" height="20" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg></button>
       <div class="track"><div class="scrub" id="scrub"><div id="ticks"></div><div class="hl" id="hl"></div></div><div class="times"><span id="tcur">0:00</span><span>${fmt(C().dur)}</span></div></div>
       <div class="speed" id="speed"><button data-r=".75">0.75×</button><button data-r="1" class="on">1×</button></div></div>
@@ -243,8 +245,8 @@ function text() {
     return `<span class="w ${cls}${flagged(i) ? ' flagged' : ''}" data-j="${i}">${esc(shown_(t, i))}</span>`; }).join(' ');
   $$('#text .w').forEach(el => el.onclick = () => { const j = +el.dataset.j, now = Date.now();  // one tap: hear it; second tap: open its card
     if (lastTap.j === j && now - lastTap.t < 350) { lastTap = {}; openCard(j); } else { lastTap = {j, t: now}; hear(j); } });
-  const ch = toks.some((t, i) => mine(t, i));  // shorter labels on a phone so the header stays two rows
-  $('#okl').textContent = phone() ? (ch ? 'Save & next' : 'Correct') : (ch ? 'Save & next clip' : 'Clip is correct');
+  const ch = toks.some((t, i) => mine(t, i));  // short labels on a phone so the header fits one row
+  $('#okl').textContent = phone() ? (ch ? 'Save' : 'Correct') : (ch ? 'Save & next clip' : 'Clip is correct');
   $('#ticks').innerHTML = toks.map((t, i) => `<i class="${flagged(i) || mine(t, i) ? 'flag' : ''}" style="left:${t.s / C().dur * 100}%;height:${8 + ((t.t.length * 7) % 18)}px"></i>`).join('');
   $('#before').innerHTML = toks.map((t, i) => mine(t, i) || t.auto ? `<span class="was">${esc(t.t)}</span>` : esc(t.t)).join(' ');
   const notes = [];
