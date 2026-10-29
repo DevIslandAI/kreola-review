@@ -64,9 +64,9 @@ Then open http://localhost:8770. Keys are read from the Windows user environment
 ## Host on EasyPanel
 
 1. **Create the app** in EasyPanel → *App* → source *GitHub* (this repository) → build *Dockerfile*.
-2. **Environment:** add the variables listed in `.env.example`. `REVIEW_PASSWORD` and `SESSION_SECRET` are
-   required: the app refuses to start without them, because otherwise anyone could hear the audio and spend the
-   Claude credit.
+2. **Environment:** add the variables listed in `.env.example`. `REVIEW_PASSWORD` is optional: without it anyone with
+   the address can use the app (and its Claude credit, capped by `CLAUDE_MAX_USD`). With it, each browser signs in once
+   and stays signed in for 30 days; it then needs a long random `SESSION_SECRET` too.
 3. **Storage:** add a volume mounted at `/data`. Nothing to copy by hand: on its first start the app downloads the
    review set and its audio (~210 MB, about 2 minutes) from the private dataset `devislandai/kreola-speech`
    (`05_review/platform/`), using `HF_TOKEN`. Later starts reuse what is on the volume.

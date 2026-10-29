@@ -22,9 +22,11 @@ DATA_DIR = Path(env("DATA_DIR", str(ROOT.parent.parent / "kreola-data" / "00_rev
 REVIEWER = env("REVIEWER_NAME", "Yukta")
 PASSWORD = env("REVIEW_PASSWORD")  # unset = no login (fine on the laptop; always set it when hosted)
 SESSION_SECRET = env("SESSION_SECRET", "local-only-change-me")
-HOSTED = env("HOSTED") == "1"  # set in the Docker image: then a password, a real session secret and https cookies are required
-if HOSTED and (not PASSWORD or SESSION_SECRET == "local-only-change-me"):
-    raise SystemExit("HOSTED=1 needs REVIEW_PASSWORD and SESSION_SECRET: otherwise anyone could use the Claude key and hear the audio")
+HOSTED = env("HOSTED") == "1"  # set in the Docker image: https cookies, and a real session secret when there is a password
+if HOSTED and PASSWORD and SESSION_SECRET == "local-only-change-me":
+    raise SystemExit("REVIEW_PASSWORD is set but SESSION_SECRET is not: set a long random SESSION_SECRET")
+if HOSTED and not PASSWORD:  # the reviewer's choice (29 Oct 2026): open access; set REVIEW_PASSWORD to turn the login back on
+    print("WARNING: no REVIEW_PASSWORD, so anyone with the address can use the app and its Claude credit", flush=True)
 CLAUDE_MODEL = env("CLAUDE_MODEL", "claude-opus-5-5")
 CLAUDE_MAX_USD = float(env("CLAUDE_MAX_USD", "9"))  # stop Claude searches before the $10 credit runs out
 MYT_KEY, MYT_BASE = env("MYT_API_KEY"), (env("MYT_BASE_URL") or "").rstrip("/")
