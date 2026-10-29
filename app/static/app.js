@@ -151,10 +151,14 @@ async function review(id, start) {
   const first = EX.clips.findIndex(c => !c.state?.verdict);
   cur = start || (first < 0 ? 0 : first);
   $('#main').innerHTML = `<section class="screen">
-  <div class="rvhead"><a class="back" href="#/c/${encodeURIComponent(EX.category)}"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>${nice(EX.category)}</a>
-    <h1>${esc(EX.title)}</h1>
-    <div class="meta" style="margin-top:6px"><span>${nice(EX.category)}</span><i></i><span>${fmt(EX.duration)}</span><i></i><span>${EX.clips.length} clips</span><i></i><span><span class="dot ${EX.difficulty}"></span>${DIFF[EX.difficulty]}</span><i></i><span>${langs(EX)}</span>
-      <button class="btn quiet helpbtn" id="helpbtn" style="margin-left:auto;padding:6px 10px">Translate</button></div></div>
+  <div class="rvbar" id="rvbar">
+    <a class="back" href="#/c/${encodeURIComponent(EX.category)}" title="Back to ${nice(EX.category)}"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${nice(EX.category)}</span></a>
+    <div class="rvt" title="${esc(EX.title)}"><b>${esc(EX.title)}</b><span class="meta"><span>${fmt(EX.duration)}</span><i></i><span><span class="dot ${EX.difficulty}"></span>${DIFF[EX.difficulty]}</span><i></i><span>${langs(EX)}</span></span></div>
+    <div class="rvnav"><button class="nb" id="prevc" aria-label="Previous clip">‹</button><span id="clipno"></span><button class="nb" id="nextc" aria-label="Next clip">›</button></div>
+    <button class="btn quiet helpbtn" id="helpbtn">Translate</button>
+    <button class="btn quiet" id="skip">Skip</button>
+    <button class="btn primary" id="ok">✓ <span id="okl">Clip is correct</span></button>
+  </div>
   <div class="rv">
     <nav class="card rail" id="rail" aria-label="Clips"></nav>
     <div class="card" id="clipcard"></div>
@@ -164,6 +168,8 @@ async function review(id, start) {
   </div></section>`;
   translator($('#htr'), w => { navigator.clipboard?.writeText(w); toast(`Copied “${w}”`); });
   $('#helpbtn').onclick = () => $('#help').classList.add('on'); $('#helpx').onclick = () => $('#help').classList.remove('on');
+  $('#ok').onclick = () => verdict(); $('#skip').onclick = () => verdict('skip');
+  $('#prevc').onclick = () => cur > 0 && load(cur - 1); $('#nextc').onclick = () => cur < EX.clips.length - 1 && load(cur + 1);
   load(cur);
 }
 function rail() {
@@ -185,8 +191,7 @@ function load(i) {
     <div class="sect"><h3>Comment on the whole clip</h3><div class="chips" id="clipchips"></div>
       <div class="field" style="margin-top:12px"><input id="clipnote" placeholder="Anything about this clip"><button class="mic" id="clipmic" title="Record a voice note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button></div>
       <div id="clipvoice"></div></div>
-    <div class="sect"><h3>Before and after</h3><div class="cmp"><div><small>myt wrote</small><span id="before"></span></div><div><small>Your version</small><span id="after"></span></div></div></div>
-    <div class="actions"><button class="btn quiet" id="skip">Skip</button><span class="grow"></span><button class="btn primary" id="ok">✓ <span id="okl"></span></button></div>`;
+    <div class="sect"><h3>Before and after</h3><div class="cmp"><div><small>myt wrote</small><span id="before"></span></div><div><small>Your version</small><span id="after"></span></div></div></div>`;
   $('#play').onclick = () => { if (audio.paused) playClip(); else stopAudio(); };
   $('#scrub').onpointerdown = e => { const r = e.currentTarget.getBoundingClientRect(); heardJ = null; audio.currentTime = C().offset + Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * C().dur; stopAt = C().offset + C().dur; };
   $$('#speed button').forEach(b => b.onclick = () => { audio.playbackRate = +b.dataset.r; $$('#speed button').forEach(x => x.classList.toggle('on', x === b)); });
@@ -196,7 +201,8 @@ function load(i) {
   $('#clipnote').oninput = e => { S().note = e.target.value; clearTimeout(load.t); load.t = setTimeout(save, 700); };
   $('#clipmic').onclick = () => record($('#clipmic'), null, () => voiceList($('#clipvoice'), C().voice.filter(v => v.word == null)));
   voiceList($('#clipvoice'), C().voice.filter(v => v.word == null));
-  $('#ok').onclick = () => verdict(); $('#skip').onclick = () => verdict('skip');
+  $('#clipno').textContent = `Clip ${cur + 1} of ${EX.clips.length}`; $('#prevc').disabled = cur === 0; $('#nextc').disabled = cur === EX.clips.length - 1;
+  $('#ok').hidden = $('#skip').hidden = false;
   history.replaceState(null, '', `#/r/${encodeURIComponent(EX.id)}/${cur}`);
   audio.currentTime = C().offset;
   rail(); text();
@@ -249,6 +255,7 @@ async function verdict(v) {
 }
 async function finished() {
   stopAudio(); OV = await api('overview'); pill(OV); rail();
+  $('#ok').hidden = $('#skip').hidden = true; $('#clipno').textContent = 'Done'; $('#nextc').disabled = true; $('#prevc').disabled = false;
   const n = nextUp(OV, EX.category) || nextUp(OV);
   $('#clipcard').innerHTML = `<div class="donebox"><span class="st done" style="width:44px;height:44px;margin:0 auto;font-size:1.1rem">✓</span>
     <h1>Recording done</h1><p class="sub">${hm(OV.hours_done)} of ${Math.round(OV.hours_total)} h reviewed.</p>
@@ -272,11 +279,12 @@ function openCard(j) {
   if (!phone()) {
     const el = $(`#text .w[data-j="${j}"]`), W = 440, H = Math.min(wc.scrollHeight || 600, innerHeight * .82);
     let r = el.getBoundingClientRect();
-    if (r.bottom + H + 20 > innerHeight && r.top - H - 20 < 70) { scrollBy(0, r.bottom + H + 24 - innerHeight); r = el.getBoundingClientRect(); }
+    const hb = $('#rvbar').getBoundingClientRect().bottom;  // keep clear of the sticky header
+    if (r.bottom + H + 20 > innerHeight && r.top - H - 20 < hb) { scrollBy(0, r.bottom + H + 24 - innerHeight); r = el.getBoundingClientRect(); }
     const left = Math.max(12, Math.min(innerWidth - W - 12, r.left + r.width / 2 - W / 2)), below = r.bottom + H + 20 <= innerHeight;
-    wc.style.left = left + 'px'; wc.style.top = (below ? r.bottom + 10 : Math.max(70, r.top - H - 10)) + scrollY + 'px';
+    wc.style.left = left + 'px'; wc.style.top = (below ? r.bottom + 10 : Math.max(hb + 8, r.top - H - 10)) + scrollY + 'px';
     wc.style.transformOrigin = `${r.left + r.width / 2 - left}px ${below ? '0' : '100%'}`;
-  } else { const r = $(`#text .w[data-j="${j}"]`).getBoundingClientRect(); scrollBy({top: r.top - 110, behavior: 'smooth'}); }
+  } else { const r = $(`#text .w[data-j="${j}"]`).getBoundingClientRect(); scrollBy({top: r.top - $('#rvbar').getBoundingClientRect().bottom - 12, behavior: 'smooth'}); }
   wc.scrollTop = 0; wc.classList.add('on'); $('#scrim').classList.add('on');
   setTimeout(() => { $('#wcin').focus(); $('#wcin').select(); }, 60);
   hear(j);
