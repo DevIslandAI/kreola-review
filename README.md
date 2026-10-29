@@ -25,6 +25,15 @@ Works on a laptop and on a phone. Three screens:
 
 Every change is saved on the server as you go.
 
+**Getting around**
+- **On a laptop:** ← and → change clips, Space plays or pauses (both ignored while typing).
+- **On a phone:**
+  - the Overview / Review / Learning tabs sit at the bottom of the screen;
+  - swipe a clip left or right to change clips;
+  - the review header (Skip, Save) stays at the top.
+- **Category pages** have a strip of every category for one-tap switching, plus ‹ › for the previous or next category.
+- **Voice notes** are stored as recorded and served as MP3, so they play on every browser, iPhones included.
+
 ## What is where
 
 | Path | What |

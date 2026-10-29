@@ -16,10 +16,19 @@ def save(raw, clip_id, word):
     name = f"{clip_id}_{uuid.uuid4().hex[:8]}"
     src = VOICE / f"{name}.webm"
     src.write_bytes(raw)
+    playable(src)
     transcript = transcribe(src)
     store.q("insert into voice(clip_id, word, file, transcript, created_at) values(?,?,?,?,?)",
             (clip_id, word, src.name, transcript, time.time()))
     return store.q("select * from voice where file=?", (src.name,), one=True)
+
+
+def playable(path):
+    """An MP3 copy next to the recording: Chrome records WebM, iPhones record MP4, and not every browser plays both."""
+    mp3 = path.with_suffix(".mp3")
+    if not mp3.exists():
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(path), "-ac", "1", "-b:a", "64k", str(mp3)], check=True)
+    return mp3
 
 
 def transcribe(path):

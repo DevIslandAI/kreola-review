@@ -52,7 +52,8 @@ function login() {
 }
 
 /* ───── overview ───── */
-const COL = ['#6B7F6E', '#A7B8A7', '#C9BDAF', '#8FA394', '#DCCFBF'];
+const FCOL = {conversation: '#6B7F6E', social_video: '#A7B8A7', public_speaking: '#C9BDAF', broadcast: '#8FA394', advert: '#DCCFBF'};
+const fcol = f => FCOL[f] || '#C9BDAF';  // one colour per family, everywhere
 let filter = 'all', shown = 40;
 async function overview() {
   const ov = OV = await api('overview'); pill(ov);
@@ -81,14 +82,14 @@ async function overview() {
     </div>
     ${next ? `<a class="upnext" href="#/r/${encodeURIComponent(next.id)}">
       <span class="pdot"><svg width="16" height="16" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg></span>
-      <span class="ut"><small>${next.status === 'half' ? 'Continue' : 'Up next'} · ${nice(next.category)}</small><b>${esc(next.title)}</b>
-        <span class="meta"><span><span class="dot ${next.difficulty}"></span>${DIFF[next.difficulty]}</span><i></i><span>${langs(next)}</span><i></i><span>${fmt(next.duration)}</span>${next.status === 'half' ? `<i></i><span>${next.done}/${next.clips} clips</span>` : ''}</span></span>
-      <span class="go">${next.status === 'half' ? 'Continue' : 'Start'} →</span></a>` : '<div class="upnext"><span class="ut"><small>All done</small><b>Every recording is reviewed 🎉</b></span></div>'}
+      <span class="ut"><small>${next.status === 'half' ? 'Continue' : 'Start'}</small><b>${nice(next.category)}</b><span class="uc">${next.done}/${next.clips} clips</span></span>
+      <span class="go"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>`
+      : '<div class="upnext"><span class="ut"><small>All done</small><b>Every recording is reviewed 🎉</b></span></div>'}
   </div>
   <div class="grid two" style="margin-top:20px">
     <div class="card"><h2>Your ${Math.round(ov.hours_total)} hours</h2>
-      <div class="stack">${fams.map(([f, h], i) => `<i style="flex:${h};background:${COL[i % 5]}"><em class="tip">${nice(f)} · ${Math.round(h / famTot * 100)}% · ${hm(h)}</em></i>`).join('')}</div>
-      <div class="legend">${fams.map(([f, h], i) => `<span><em style="background:${COL[i % 5]}"></em>${nice(f)} <b>${Math.round(h / famTot * 100)}%</b></span>`).join('')}</div></div>
+      <div class="stack">${fams.map(([f, h], i) => `<i style="flex:${h};background:${fcol(f)}"><em class="tip">${nice(f)} · ${Math.round(h / famTot * 100)}% · ${hm(h)}</em></i>`).join('')}</div>
+      <div class="legend">${fams.map(([f, h], i) => `<span><em style="background:${fcol(f)}"></em>${nice(f)} <b>${Math.round(h / famTot * 100)}%</b></span>`).join('')}</div></div>
     <div class="card"><h2>Progress by mix</h2>${row('Kreol', 'mfe_Latn')}${row('French', 'fra_Latn')}${row('English', 'eng_Latn')}<div style="height:8px"></div>
       ${row('<span class="dot hard"></span>Hard', 'hard')}${row('<span class="dot typ"></span>Typical', 'typ')}${row('<span class="dot easy"></span>Easy', 'easy')}</div>
   </div>
@@ -105,15 +106,21 @@ function catStats() {
   }
   return Object.values(c);
 }
+function famOrder() {
+  const fams = {};
+  catStats().forEach(x => (fams[x.family] ??= []).push(x));
+  return Object.entries(fams).map(([f, xs]) => [f, xs.sort((a, b) => b.hours - a.hours)])
+    .sort((a, b) => b[1].reduce((s, x) => s + x.hours, 0) - a[1].reduce((s, x) => s + x.hours, 0));
+}
 function cats() {
-  const st = catStats(), fams = {};
-  st.forEach(x => (fams[x.family] ??= []).push(x));
-  const order = Object.entries(fams).sort((a, b) => b[1].reduce((s, x) => s + x.hours, 0) - a[1].reduce((s, x) => s + x.hours, 0));
-  $('#cats').innerHTML = order.map(([f, xs]) => `<div class="fam"><h3>${nice(f)}</h3><div class="tiles">${xs.sort((a, b) => b.hours - a.hours).map(x => {
-    const p = Math.round(x.clipsDone / x.clips * 100);
-    return `<a class="tile ${p === 100 ? 'done' : ''}" href="#/c/${encodeURIComponent(x.cat)}"><b>${nice(x.cat)}</b>
-      <span class="tm">${x.recs} recording${x.recs > 1 ? "s" : ""} · ${hm(x.hours)}</span><div class="bar"><i style="width:${p}%"></i></div>
-      <span class="tp">${p === 100 ? '✓ Done' : p ? `${p}% · ${x.recsDone} of ${x.recs} done` : 'Not started'}</span></a>`; }).join('')}</div></div>`).join('');
+  $('#cats').innerHTML = famOrder().map(([f, xs]) => {
+    const c = xs.reduce((s, x) => s + x.clips, 0), d = xs.reduce((s, x) => s + x.clipsDone, 0), h = xs.reduce((s, x) => s + x.hours, 0);
+    return `<section class="fam" style="--fc:${fcol(f)}"><header><span class="fdot"></span><h3>${nice(f)}</h3>
+      <span class="fm">${xs.length} categor${xs.length > 1 ? 'ies' : 'y'} · ${hm(h)}</span><span class="fp">${Math.round(d / c * 100)}%</span></header>
+      <div class="tiles">${xs.map(x => { const p = Math.round(x.clipsDone / x.clips * 100);
+        return `<a class="tile ${p === 100 ? 'done' : ''}" href="#/c/${encodeURIComponent(x.cat)}"><b>${nice(x.cat)}</b>
+          <span class="tm">${x.recs} recording${x.recs > 1 ? 's' : ''} · ${hm(x.hours)}</span><div class="bar"><i style="width:${p}%"></i></div>
+          <span class="tp">${p === 100 ? '✓ Done' : p ? `${p}% · ${x.recsDone} of ${x.recs} done` : 'Not started'}</span></a>`; }).join('')}</div></section>`; }).join('');
 }
 /* one category: every recording in it, with what is done and what is not */
 async function category(cat) {
@@ -121,9 +128,13 @@ async function category(cat) {
   const x = catStats().find(s => s.cat === cat);
   if (!x) return (location.hash = '#/');
   const next = nextUp(OV, cat), p = Math.round(x.clipsDone / x.clips * 100);
-  $('#main').innerHTML = `<section class="screen">
+  const all = famOrder().flatMap(([, xs]) => xs), k = all.findIndex(y => y.cat === cat), prev = all[k - 1], nxt = all[k + 1];
+  const strip = `<nav class="catstrip" aria-label="Categories">${all.map(y => `<a class="cchip ${y.cat === cat ? 'on' : ''}" style="--fc:${fcol(y.family)}" href="#/c/${encodeURIComponent(y.cat)}"><span class="fdot"></span>${nice(y.cat)}<small>${Math.round(y.clipsDone / y.clips * 100)}%</small></a>`).join('')}</nav>`;
+  $('#main').innerHTML = `<section class="screen">${strip}
   <div class="rvhead"><a class="back" href="#/"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Overview</a>
-    <h1>${nice(cat)}</h1><div class="meta" style="margin-top:6px"><span>${nice(x.family)}</span><i></i><span>${x.recs} recording${x.recs > 1 ? "s" : ""}</span><i></i><span>${hm(x.hours)}</span><i></i><span>${x.clips} clips</span></div></div>
+    <div class="cathead"><h1>${nice(cat)}</h1><span class="catnav">
+      <a class="nb" ${prev ? `href="#/c/${encodeURIComponent(prev.cat)}" title="${nice(prev.cat)}"` : 'aria-disabled="true"'}>‹</a><a class="nb" ${nxt ? `href="#/c/${encodeURIComponent(nxt.cat)}" title="${nice(nxt.cat)}"` : 'aria-disabled="true"'}>›</a></span></div>
+    <div class="meta" style="margin-top:6px"><span>${nice(x.family)}</span><i></i><span>${x.recs} recording${x.recs > 1 ? "s" : ""}</span><i></i><span>${hm(x.hours)}</span><i></i><span>${x.clips} clips</span></div></div>
   <div class="card catbar"><div style="flex:1"><div class="rowbar" style="margin:0;grid-template-columns:1fr 150px"><div class="bar"><i style="width:${p}%"></i></div><span class="n">${x.clipsDone} of ${x.clips} clips · ${p}%</span></div></div>
     ${next ? `<a class="btn primary" href="#/r/${encodeURIComponent(next.id)}">${next.status === 'half' ? 'Continue' : 'Start'} →</a>` : '<span class="tag">✓ All done</span>'}</div>
   <div class="card" style="margin-top:20px">
@@ -132,6 +143,7 @@ async function category(cat) {
     <div class="list" id="list"></div><div class="more" id="more"></div>
   </div></section>`;
   $$('#filter button').forEach(b => b.onclick = () => { filter = b.dataset.f; shown = 40; $$('#filter button').forEach(y => y.classList.toggle('on', y === b)); list(cat); });
+  $('.cchip.on')?.scrollIntoView({inline: 'center', block: 'nearest'});
   list(cat);
 }
 function list(cat) {
@@ -173,7 +185,7 @@ async function review(id, start) {
   <div class="rvbar" id="rvbar">
     <a class="back" href="#/c/${encodeURIComponent(EX.category)}" title="Back to ${nice(EX.category)}"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${nice(EX.category)}</span></a>
     <div class="rvt" title="${esc(EX.title)}"><b>${esc(EX.title)}</b><span class="meta"><span>${fmt(EX.duration)}</span><i></i><span><span class="dot ${EX.difficulty}"></span>${DIFF[EX.difficulty]}</span><i></i><span>${langs(EX)}</span></span></div>
-    <div class="rvnav"><button class="nb" id="prevc" aria-label="Previous clip">‹</button><span id="clipno"></span><button class="nb" id="nextc" aria-label="Next clip">›</button></div>
+    <div class="rvnav"><button class="nb" id="prevc" aria-label="Previous clip" title="Previous clip (←)">‹</button><span id="clipno"></span><button class="nb" id="nextc" aria-label="Next clip" title="Next clip (→)">›</button></div>
     <button class="btn quiet helpbtn" id="helpbtn" title="Translate / find a word"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h8M8 3v2M6 5c0 4 2 7 6 9M10 5c0 3-2 6-6 8"/><path d="m13 21 4-9 4 9M14.5 18h5"/></svg><span class="tw">Translate</span></button>
     <button class="btn quiet" id="skip">Skip</button>
     <button class="btn primary" id="ok">✓ <span id="okl">Clip is correct</span></button>
@@ -327,6 +339,20 @@ $('#wcsave').onclick = saveCard; $('#wccancel').onclick = $('#wcx').onclick = $(
 $('#wchear').onclick = () => hear(cj);
 $('#wcrm').onclick = () => { draft.gone = !draft.gone; if (draft.gone) saveCard(); else $('#wcrm').textContent = 'Remove this word (not said)'; };
 addEventListener('keydown', e => { if (e.key === 'Escape') { closeCard(); $('#help')?.classList.remove('on'); } });
+/* moving around without reaching for buttons: laptop ← → change clip, Space plays; phone: swipe the clip left / right */
+const reviewing = () => EX && $('#text') && !$('#wc').classList.contains('on');
+addEventListener('keydown', e => {
+  if (!reviewing() || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === 'ArrowRight' && cur < EX.clips.length - 1) { e.preventDefault(); load(cur + 1); }
+  else if (e.key === 'ArrowLeft' && cur > 0) { e.preventDefault(); load(cur - 1); }
+  else if (e.code === 'Space') { e.preventDefault(); $('#play').click(); }
+});
+let sw = null;
+addEventListener('touchstart', e => { sw = reviewing() && e.target.closest('#clipcard') && !e.target.closest('input,textarea,.scrub') ? {x: e.touches[0].clientX, y: e.touches[0].clientY} : null; }, {passive: true});
+addEventListener('touchend', e => {
+  if (!sw) return; const dx = e.changedTouches[0].clientX - sw.x, dy = e.changedTouches[0].clientY - sw.y; sw = null;
+  if (Math.abs(dx) > 70 && Math.abs(dy) < 45) { if (dx < 0 && cur < EX.clips.length - 1) load(cur + 1); else if (dx > 0 && cur > 0) load(cur - 1); }
+}, {passive: true});
 
 /* translator: your word on the left (its language), the translation on the right (the language you want).
    Dictionary results appear while typing; "Translate" asks Claude. Every word gets a definition, or "Don't know". */
@@ -410,13 +436,11 @@ async function record(btn, word, after) {
 }
 const vAudio = new Audio(); let vBtn = null;
 const PLAYI = '<svg width="14" height="14" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg>', PAUSEI = '<svg width="14" height="14" viewBox="0 0 20 20"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/></svg>';
-vAudio.ontimeupdate = () => { const bar = vBtn?.closest('.vcard')?.querySelector('.vbar i'), t = vBtn?.closest('.vcard')?.querySelector('.vtime');
-  if (bar && isFinite(vAudio.duration)) bar.style.width = vAudio.currentTime / vAudio.duration * 100 + '%'; if (t) t.textContent = fmt(vAudio.currentTime); };
+vAudio.ontimeupdate = () => { const t = vBtn?.closest('.vcard')?.querySelector('.vtime'); if (t) t.textContent = fmt(vAudio.currentTime); };
 vAudio.onended = vAudio.onpause = () => { if (vBtn) vBtn.innerHTML = PLAYI; };
 function voiceList(el, arr) {
   el.innerHTML = arr.map(v => `<div class="vcard"><button class="vplay" data-id="${v.id}" aria-label="Play voice note">${PLAYI}</button>
     <div class="vbody"><div class="vtop"><span class="vlabel"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Voice note</span><span class="vtime">0:00</span></div>
-      <div class="vbar"><i></i></div>
       ${v.transcript ? `<p class="vtext">${esc(v.transcript)}</p>` : '<p class="vtext none">No transcript (the note is kept)</p>'}</div></div>`).join('');
   el.querySelectorAll('.vplay').forEach(b => b.onclick = () => {
     if (vBtn === b && !vAudio.paused) return vAudio.pause();

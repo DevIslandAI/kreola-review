@@ -194,7 +194,7 @@ def get_voice(vid: int):
     v = store.q("select file from voice where id=?", (vid,), one=True)
     if not v:
         raise HTTPException(404)
-    return FileResponse(voice.VOICE / v["file"], media_type="audio/webm")
+    return FileResponse(voice.playable(voice.VOICE / v["file"]), media_type="audio/mpeg")  # MP3 plays everywhere
 
 
 @app.get("/api/learning")
