@@ -3,7 +3,7 @@ __pycache__/
 *.pyc
 .env
 # review data never goes to git: it lives in DATA_DIR (laptop) or the /data volume (server)
-data/
+/data/
 *.db
 *.mp3
 *.webm
