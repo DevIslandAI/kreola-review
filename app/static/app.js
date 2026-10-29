@@ -416,23 +416,31 @@ const cardTr = translator($('#wctr'), w => { $('#wcin').value = w; $('#wcin').fo
 
 /* voice notes: recorded in the browser, stored and transcribed on the server (myt, English/French) */
 let rec = null;
+/* the mic shows what is happening: recording (red, live timer) -> saving and transcribing (spinner) -> the finished note */
+const SPIN = '<span class="spin" aria-hidden="true"></span>';
 async function record(btn, word, after) {
   if (rec?.state === 'recording') { rec.stop(); return; }
+  if (btn.classList.contains('busy')) return;
   let st;
   try { st = await navigator.mediaDevices.getUserMedia({audio: true}); }
   catch (e) { toast('Microphone not available: allow it in the browser'); return; }
-  const chunks = [], clip = C();
+  const chunks = [], clip = C(), icon = btn.innerHTML, list = $(btn.id === 'wcmic' ? '#wcvoice' : '#clipvoice'), t0 = Date.now();
+  list.insertAdjacentHTML('beforeend', '<div class="vpending rec"><span class="rdot"></span><span class="vmsg">Recording 0:00</span><span class="vhint">tap the mic to stop</span></div>');
+  const pend = list.lastElementChild, msg = pend.querySelector('.vmsg');
+  const timer = setInterval(() => msg.textContent = `Recording ${fmt((Date.now() - t0) / 1000)}`, 250);
   rec = new MediaRecorder(st);
   rec.ondataavailable = e => chunks.push(e.data);
   rec.onstop = async () => {
-    st.getTracks().forEach(t => t.stop()); btn.classList.remove('rec'); btn.classList.add('busy');
+    clearInterval(timer); st.getTracks().forEach(t => t.stop());
+    btn.classList.remove('rec'); btn.classList.add('busy'); btn.innerHTML = SPIN;
+    pend.className = 'vpending busy'; pend.innerHTML = `${SPIN}<span class="vmsg">Saving and transcribing…</span><span class="vhint">${fmt((Date.now() - t0) / 1000)}</span>`;
     const fd = new FormData(); fd.append('file', new Blob(chunks, {type: rec.mimeType || 'audio/webm'}), 'note.webm'); fd.append('clip_id', clip.clip_id);
     if (word != null) fd.append('word', word);
     try { const v = await api('voice', {method: 'POST', body: fd}); clip.voice.push(v); toast(v.transcript ? 'Voice note saved and transcribed' : 'Voice note saved'); after(); if (EX && C() === clip && !$('#wc').classList.contains('on')) text(); }
-    catch (e) { toast('Voice note not saved: ' + e.message); }
-    btn.classList.remove('busy');
+    catch (e) { pend.remove(); toast('Voice note not saved: ' + e.message); }
+    btn.classList.remove('busy'); btn.innerHTML = icon;
   };
-  rec.start(); btn.classList.add('rec'); toast('Recording… tap the mic again to stop');
+  rec.start(); btn.classList.add('rec');
 }
 const vAudio = new Audio(); let vBtn = null;
 const PLAYI = '<svg width="14" height="14" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg>', PAUSEI = '<svg width="14" height="14" viewBox="0 0 20 20"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/></svg>';
