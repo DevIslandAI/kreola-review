@@ -5,6 +5,7 @@
 import hmac
 import json
 from collections import Counter, defaultdict
+from datetime import datetime
 
 import anthropic
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -84,7 +85,11 @@ def overview():
             total[e[k]] += e["duration"]
     fixed = sum(len(s["edits"]) for s in states.values())
     notes = store.q("select count(*) n from voice", one=True)["n"]
+    midnight = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    today = sum(CLIPS[c][1]["dur"] for c, s in states.items() if s["verdict"] and (s["updated_at"] or 0) >= midnight)
+    work = sum(s["seconds"] or 0 for s in states.values())  # time actually spent reviewing (capped per clip)
     return {"name": REVIEWER, "hours_done": hours["all"] / 3600, "hours_total": sum(e["duration"] for e in SET["excerpts"]) / 3600,
+            "today_hours": today / 3600, "work_hours": work / 3600,
             "done_hours": {k: v / 3600 for k, v in hours.items()}, "total_hours": {k: v / 3600 for k, v in total.items()},
             "words_fixed": fixed, "voice_notes": notes, "excerpts": items}
 

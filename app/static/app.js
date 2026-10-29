@@ -2,7 +2,7 @@
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-const hm = h => `${Math.floor(h)} h ${String(Math.round(h % 1 * 60)).padStart(2, '0')}`;
+const hm = h => `${Math.floor(h)} h ${String(Math.round(h % 1 * 60)).padStart(2, '0')}`;  // non-breaking: "10 h 02" never splits
 const phone = () => matchMedia('(max-width:720px)').matches;
 const LANG = {mfe_Latn: 'Kreol', fra_Latn: 'French', eng_Latn: 'English'};
 const DIFF = {hard: 'Hard', typ: 'Typical', easy: 'Easy'};
@@ -56,21 +56,33 @@ let filter = 'all', shown = 40;
 async function overview() {
   const ov = OV = await api('overview'); pill(ov);
   const pct = Math.round(ov.hours_done / ov.hours_total * 100), next = nextUp(ov), hour = new Date().getHours();
+  // time left = your reviewing time per hour of audio so far x audio left (shown once there is enough to measure)
+  const pace = ov.hours_done * 60 >= 2 && ov.work_hours > 0 ? ov.work_hours / ov.hours_done * (ov.hours_total - ov.hours_done) : 0;
+  const dur = h => h * 60 < 60 ? `${Math.round(h * 60)} min` : hm(h);
   const fams = Object.entries(ov.total_hours).filter(([k]) => ov.excerpts.some(e => e.family === k)).sort((a, b) => b[1] - a[1]);
   const famTot = fams.reduce((a, [, h]) => a + h, 0);
   const row = (label, k) => { const d = ov.done_hours[k] || 0, t = ov.total_hours[k] || 0;
     return `<div class="rowbar"><span>${label}</span><div class="bar"><i style="width:${t ? d / t * 100 : 0}%"></i></div><span class="n">${d.toFixed(1)} / ${t.toFixed(1)} h</span></div>`; };
   $('#main').innerHTML = `<section class="screen">
   <div class="card hero">
-    <div class="ring"><svg viewBox="0 0 150 150"><circle cx="75" cy="75" r="64" fill="none" stroke="#E7E1D8" stroke-width="12"/>
-      <circle cx="75" cy="75" r="64" fill="none" stroke="#6B7F6E" stroke-width="12" stroke-linecap="round" stroke-dasharray="402" stroke-dashoffset="${402 - 402 * pct / 100}"/></svg>
-      <div class="v"><b>${pct}%</b><small>of ${Math.round(ov.hours_total)} hours</small></div></div>
-    <div><h1>Good ${hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'}, ${esc(ov.name)}</h1>
-      <p class="sub" style="margin-top:4px">${ov.excerpts.filter(e => e.status === 'done').length} of ${ov.excerpts.length} recordings reviewed · ${hm(ov.hours_total - ov.hours_done)} left</p>
-      <div class="stats"><div><b>${hm(ov.hours_done)}</b><span>Audio reviewed</span></div><div><b>${ov.words_fixed.toLocaleString()}</b><span>Words fixed</span></div><div><b>${ov.voice_notes}</b><span>Voice notes</span></div></div></div>
-    ${next ? `<div class="next"><small>Up next</small><p>${esc(next.title)}</p>
-      <div class="meta" style="margin-bottom:16px"><span><span class="dot ${next.difficulty}"></span>${DIFF[next.difficulty]}</span><i></i><span>${langs(next)}</span><i></i><span>${fmt(next.duration)}</span></div>
-      <a class="btn primary" href="#/r/${encodeURIComponent(next.id)}">${next.status === 'half' ? 'Continue' : 'Start'} reviewing →</a></div>` : '<div class="next"><small>All done</small><p>Every recording is reviewed 🎉</p></div>'}
+    <div class="hhead">
+      <div class="ring"><svg viewBox="0 0 150 150"><circle cx="75" cy="75" r="62" fill="none" stroke="#E7E1D8" stroke-width="14"/>
+        <circle cx="75" cy="75" r="62" fill="none" stroke="#6B7F6E" stroke-width="14" stroke-linecap="round" stroke-dasharray="390" stroke-dashoffset="${390 - 390 * Math.max(pct, .5) / 100}"/></svg>
+        <div class="v"><b>${pct}%</b></div></div>
+      <div class="hi"><h1>Good ${hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'}, ${esc(ov.name)}</h1>
+        <p class="sub"><b>${hm(ov.hours_done)}</b> of ${Math.round(ov.hours_total)} h reviewed · ${hm(ov.hours_total - ov.hours_done)} to go</p></div>
+    </div>
+    <div class="kpis">
+      <div><b>${dur(ov.today_hours)}</b><span>Today</span></div>
+      <div><b>${ov.words_fixed.toLocaleString()}</b><span>Words fixed</span></div>
+      <div><b>${ov.voice_notes}</b><span>Voice notes</span></div>
+      <div title="Time you spend per hour of audio, so far, times the audio left">${pace ? `<b>≈ ${Math.round(pace)} h</b><span>Left at your pace</span>` : '<b>—</b><span>Pace after a few clips</span>'}</div>
+    </div>
+    ${next ? `<a class="upnext" href="#/r/${encodeURIComponent(next.id)}">
+      <span class="pdot"><svg width="16" height="16" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg></span>
+      <span class="ut"><small>${next.status === 'half' ? 'Continue' : 'Up next'} · ${nice(next.category)}</small><b>${esc(next.title)}</b>
+        <span class="meta"><span><span class="dot ${next.difficulty}"></span>${DIFF[next.difficulty]}</span><i></i><span>${langs(next)}</span><i></i><span>${fmt(next.duration)}</span>${next.status === 'half' ? `<i></i><span>${next.done}/${next.clips} clips</span>` : ''}</span></span>
+      <span class="go">${next.status === 'half' ? 'Continue' : 'Start'} →</span></a>` : '<div class="upnext"><span class="ut"><small>All done</small><b>Every recording is reviewed 🎉</b></span></div>'}
   </div>
   <div class="grid two" style="margin-top:20px">
     <div class="card"><h2>Your ${Math.round(ov.hours_total)} hours</h2>
