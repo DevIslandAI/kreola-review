@@ -4,7 +4,7 @@
 """
 import hmac
 import json
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import datetime
 
 import anthropic
@@ -195,41 +195,6 @@ def get_voice(vid: int):
     if not v:
         raise HTTPException(404)
     return FileResponse(voice.playable(voice.VOICE / v["file"]), media_type="audio/mpeg")  # MP3 plays everywhere
-
-
-@app.get("/api/learning")
-def learning():
-    states = store.clip_states()
-    pairs, reasons = Counter(), Counter()
-    for cid, s in states.items():
-        clip = CLIPS[cid][1]
-        for i, e in s["edits"].items():
-            t = clip["tokens"][int(i)]
-            reasons.update(e.get("why", []))
-            if e.get("gone"):
-                pairs[(t["t"], "(removed)")] += 1
-            elif e.get("show") and e["show"] != (t.get("auto") or t["t"]):
-                pairs[(t["t"], e["show"])] += 1
-        reasons.update(s["why"])
-    decided = {r["key"]: r["decision"] for r in store.q("select * from rules")}
-    rules = [{"key": f"{a}→{b}", "from": a, "to": b, "seen": n, "decision": decided.get(f"{a}→{b}")}
-             for (a, b), n in pairs.most_common() if n >= 3]
-    return {"fixes": sum(pairs.values()), "reasons": reasons.most_common(), "top": [[a, b, n] for (a, b), n in pairs.most_common(12)],
-            "rules": rules, "spent": store.spent(), "budget": CLAUDE_MAX_USD,
-            "lookups": store.q("select count(*) n from lookups", one=True)["n"],
-            "chosen": store.q("select count(*) n from lookups where chosen is not null", one=True)["n"]}
-
-
-class Rule(BaseModel):
-    key: str
-    decision: str  # yes | no
-
-
-@app.post("/api/rules")
-def decide(r: Rule):
-    store.q("insert into rules(key, decision, updated_at) values(?,?,strftime('%s','now')) "
-            "on conflict(key) do update set decision=excluded.decision, updated_at=excluded.updated_at", (r.key, r.decision))
-    return {"ok": True}
 
 
 @app.get("/api/export", response_class=PlainTextResponse)

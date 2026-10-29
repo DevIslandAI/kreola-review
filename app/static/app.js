@@ -1,4 +1,4 @@
-/* Kreola Review: screens (Overview, Review, Learning), word card, autosave, voice notes. No build step. */
+/* Kreola Review: screens (Overview, category, Review), word card, autosave, voice notes. No build step. */
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -26,10 +26,9 @@ let OV = null;
 async function route() {
   closeCard(); stopAudio();
   const h = location.hash.replace(/^#\/?/, '').split('/');
-  $$('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === ({r: 'review', review: 'review', learning: 'learning'}[h[0]] || 'overview')));
+  $$('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === ({r: 'review', review: 'review'}[h[0]] || 'overview')));
   if (h[0] !== 'c') filter = 'all';
   try {
-    if (h[0] === 'learning') return learning();
     if (h[0] === 'c' && h[1]) return category(decodeURIComponent(h[1]));
     if (h[0] === 'r' && h[1]) return review(decodeURIComponent(h[1]), +h[2] || 0);
     if (h[0] === 'review') { OV = await api('overview'); const n = nextUp(OV); return n ? (location.hash = `#/r/${n.id}`) : overview(); }
@@ -453,32 +452,6 @@ function voiceList(el, arr) {
   });
 }
 $('#wcmic').onclick = () => record($('#wcmic'), cj, () => voiceList($('#wcvoice'), wordVoice(cj)));
-
-/* ───── learning ───── */
-async function learning() {
-  const [L, ov] = await Promise.all([api('learning'), OV ? OV : api('overview')]); OV = ov; pill(ov);
-  const maxR = Math.max(1, ...L.reasons.map(r => r[1]));
-  $('#main').innerHTML = `<section class="screen"><h1>What Claude is learning</h1><p class="sub" style="margin-top:6px">Your fixes become rules. The rules fix the other 90 hours.</p>
-  <div class="card" style="margin-top:20px"><div class="flow">
-    <div class="s"><b>1 · You fix</b><span>8 h of clips, word by word</span></div><div class="arr">→</div>
-    <div class="s"><b>2 · Claude finds patterns</b><span>Dictionary, rules and examples</span></div><div class="arr">→</div>
-    <div class="s"><b>3 · The exam</b><span>2 h Claude never sees: must beat myt</span></div><div class="arr">→</div>
-    <div class="s"><b>4 · The 90 hours</b><span>Fixed in batches; doubtful clips come back to you</span></div></div></div>
-  <div class="grid two" style="margin-top:20px">
-    <div class="card"><h2>Why words were fixed</h2>${L.reasons.length ? L.reasons.map(([k, n]) => `<div class="rowbar"><span>${esc(k)}</span><div class="bar"><i style="width:${n / maxR * 100}%"></i></div><span class="n">${n}</span></div>`).join('') : '<p class="empty">Reasons you pick in the word card appear here.</p>'}
-      <div style="height:16px"></div><h2>Most common fixes · ${L.fixes} so far</h2>
-      ${L.top.length ? `<table><tr><th>myt wrote</th><th>you wrote</th><th style="text-align:right">times</th></tr>${L.top.map(([a, b, n]) => `<tr><td class="from">${esc(a)}</td><td class="to">${esc(b)}</td><td class="n">${n}</td></tr>`).join('')}</table>` : '<p class="empty">Your fixes appear here as you review.</p>'}</div>
-    <div class="grid">
-      <div class="card"><h2>Rules Claude proposes</h2>${L.rules.length ? L.rules.map(r => `<div class="prop"><div><p>Write <b class="to">${esc(r.to)}</b> instead of <span class="from">${esc(r.from)}</span></p><small>You made this fix ${r.seen}×</small></div>
-        <div class="yn" data-k="${esc(r.key)}"><button class="y ${r.decision === 'yes' ? 'on' : ''}" title="Yes, apply it">✓</button><button class="n ${r.decision === 'no' ? 'on' : ''}" title="No">✕</button></div></div>`).join('') : '<p class="empty">A rule is proposed once you make the same fix 3 times.</p>'}</div>
-      <div class="card"><h2>The exam</h2><p class="sub" style="font-size:.88rem">After your first hour, Claude corrects exam clips without seeing your answers. Here you'll see the share of words wrong: myt alone vs Claude with your rules.</p></div>
-      <div class="card"><h2>Claude searches</h2><div class="rowbar"><span>Budget used</span><div class="bar"><i style="width:${L.spent / L.budget * 100}%"></i></div><span class="n">$${L.spent.toFixed(2)} / ${L.budget.toFixed(0)}</span></div>
-        <p class="sub" style="font-size:.86rem">${L.lookups} searches · ${L.chosen} suggestions used</p></div>
-    </div></div></section>`;
-  $$('.yn').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = async () => {
-    const d = b.classList.contains('y') ? 'yes' : 'no'; await api('rules', {method: 'POST', body: {key: g.dataset.k, decision: d}});
-    g.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); toast(d === 'yes' ? 'Rule approved' : 'Rule rejected'); }));
-}
 
 /* ───── start ───── */
 async function start() {

@@ -3,7 +3,7 @@
 The web app where 10 hours of Kreola clips are listened to and corrected by hand. Those hours become the
 golden dataset, and they teach Claude how to correct the other ~90 hours the same way.
 
-Works on a laptop and on a phone. Three screens:
+Works on a laptop and on a phone. Screens:
 
 - **Overview**: progress out of 10 h, the share of each recording type, and the recordings grouped by **category** (tiles
   grouped by family, each with its progress). A category page lists its recordings with clips done, and *Start / Continue*
@@ -21,14 +21,13 @@ Works on a laptop and on a phone. Three screens:
        - Tap a translation to put it in the correct-word box.
     3. **Comment**: quick reasons, a typed comment, or a voice note (transcribed automatically).
   - Each clip also has a comment, a *before and after* view, and *Clip is correct* / *Save & next clip*.
-- **Learning**: why words were fixed, the most common fixes, rules proposed from repeated fixes, and Claude spending.
 
 Every change is saved on the server as you go.
 
 **Getting around**
 - **On a laptop:** ← and → change clips, Space plays or pauses (both ignored while typing).
 - **On a phone:**
-  - the Overview / Review / Learning tabs sit at the bottom of the screen;
+  - the Overview / Review tabs sit at the bottom of the screen;
   - swipe a clip left or right to change clips;
   - the review header (Skip, Save) stays at the top.
 - **Category pages** have a strip of every category for one-tap switching, plus ‹ › for the previous or next category.
@@ -81,7 +80,7 @@ Then open http://localhost:8770. Keys are read from the Windows user environment
 
 A Claude search with Claude Opus 5.5 costs about $0.02 for the first search, and less for searches made within the next 5
 minutes, because the spelling rules are then read from Claude's cache. The app stops searching at `CLAUDE_MAX_USD` (default $9),
-and the Learning screen shows what has been spent. `CLAUDE_MODEL=claude-sonnet-5-5` halves the cost.
+and the translator shows what has been spent after each search. `CLAUDE_MODEL=claude-sonnet-5-5` halves the cost.
 
 ## Credits
 
