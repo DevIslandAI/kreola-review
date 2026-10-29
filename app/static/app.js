@@ -63,8 +63,6 @@ async function overview() {
   const dur = h => h * 60 < 60 ? `${Math.round(h * 60)} min` : hm(h);
   const fams = Object.entries(ov.total_hours).filter(([k]) => ov.excerpts.some(e => e.family === k)).sort((a, b) => b[1] - a[1]);
   const famTot = fams.reduce((a, [, h]) => a + h, 0);
-  const row = (label, k) => { const d = ov.done_hours[k] || 0, t = ov.total_hours[k] || 0;
-    return `<div class="rowbar"><span>${label}</span><div class="bar"><i style="width:${t ? d / t * 100 : 0}%"></i></div><span class="n">${d.toFixed(1)} / ${t.toFixed(1)} h</span></div>`; };
   $('#main').innerHTML = `<section class="screen">
   <div class="card hero">
     <div class="hhead">
@@ -86,12 +84,10 @@ async function overview() {
       <span class="go"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>`
       : '<div class="upnext"><span class="ut"><small>All done</small><b>Every recording is reviewed 🎉</b></span></div>'}
   </div>
-  <div class="grid two" style="margin-top:20px">
+  <div style="margin-top:20px">
     <div class="card"><h2>Your ${Math.round(ov.hours_total)} hours</h2>
       <div class="stack">${fams.map(([f, h], i) => `<i style="flex:${h};background:${fcol(f)}"><em class="tip">${nice(f)} · ${Math.round(h / famTot * 100)}% · ${hm(h)}</em></i>`).join('')}</div>
       <div class="legend">${fams.map(([f, h], i) => `<span><em style="background:${fcol(f)}"></em>${nice(f)} <b>${Math.round(h / famTot * 100)}%</b></span>`).join('')}</div></div>
-    <div class="card"><h2>Progress by mix</h2>${row('Kreol', 'mfe_Latn')}${row('French', 'fra_Latn')}${row('English', 'eng_Latn')}<div style="height:8px"></div>
-      ${row('<span class="dot hard"></span>Hard', 'hard')}${row('<span class="dot typ"></span>Typical', 'typ')}${row('<span class="dot easy"></span>Easy', 'easy')}</div>
   </div>
   <div class="card" style="margin-top:20px"><h2>Recordings by category</h2><div id="cats"></div></div></section>`;
   $$('.stack i').forEach(el => el.onclick = () => { const on = el.classList.contains('on'); $$('.stack i').forEach(x => x.classList.remove('on')); if (!on) el.classList.add('on'); });
