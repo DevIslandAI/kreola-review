@@ -167,7 +167,7 @@ h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--in
 /* word card: popover on laptop, bottom sheet on phone */
 .scrim{position:fixed;inset:0;background:rgba(31,36,33,.18);opacity:0;pointer-events:none;transition:opacity .25s;z-index:40}
 .scrim.on{opacity:1;pointer-events:auto}
-.wc{position:absolute;z-index:45;width:380px;max-height:min(82vh,680px);overflow:auto;overscroll-behavior:contain;background:rgba(250,247,242,.97);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);border-radius:20px;box-shadow:var(--lift);border:1px solid rgba(255,255,255,.7);padding:18px;opacity:0;transform:scale(.96);pointer-events:none;transition:opacity .18s,transform .25s cubic-bezier(.2,.8,.2,1)}
+.wc{position:absolute;z-index:45;width:440px;max-height:min(82vh,680px);overflow:auto;overscroll-behavior:contain;background:rgba(250,247,242,.97);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);border-radius:20px;box-shadow:var(--lift);border:1px solid rgba(255,255,255,.7);padding:18px;opacity:0;transform:scale(.96);pointer-events:none;transition:opacity .18s,transform .25s cubic-bezier(.2,.8,.2,1)}
 .wc.on{opacity:1;transform:none;pointer-events:auto}
 .wc .top2{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .wc .top2 b{font-weight:500;font-size:1.05rem}
@@ -180,17 +180,27 @@ h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--in
 .wc .row{display:flex;gap:10px;margin-top:16px}
 .wc .row .btn{flex:1}
 .wc .rm{font-size:.8rem;color:var(--clay);margin-top:12px;display:inline-block}
-.hits{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.hit{font-size:.84rem;padding:6px 10px;border-radius:10px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.06);text-align:left}
-.hit small{color:var(--ink3);margin-left:4px}
-.opts{margin-top:10px;display:grid;gap:8px}
-.opt{display:block;width:100%;text-align:left;background:#fff;border-radius:12px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:box-shadow .15s}
+/* translator: your word on the left, the translation on the right */
+.tr .sides{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:start}
+.tr .side{background:var(--ivory);border-radius:14px;box-shadow:var(--inset);padding:8px;min-height:118px;display:flex;flex-direction:column}
+.tr .side.out{background:#FBF9F5}
+.tr select{font:inherit;font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--sage-d);background:transparent;border:0;padding:4px 2px;cursor:pointer;outline:0;align-self:flex-start}
+.tr textarea{border:0;outline:0;background:transparent;resize:none;font-size:1.02rem;font-weight:500;padding:4px 2px;min-height:40px;width:100%}
+.tr .swap{width:34px;height:34px;border-radius:50%;background:var(--card);box-shadow:var(--shadow);border:1px solid var(--line);margin-top:26px;color:var(--ink2)}
+.tr .swap:active{transform:rotate(180deg)}
+.def{font-size:.78rem;color:var(--ink2);padding:2px 2px 0;line-height:1.4}
+.def .lg,.opt .lg{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--sage);font-weight:600;margin-right:4px}
+.dk{color:var(--ink3);font-style:italic}
+.opts{display:grid;gap:6px;margin-top:4px}
+.opt{display:block;width:100%;text-align:left;background:#fff;border-radius:10px;padding:8px 10px;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:box-shadow .15s}
 .opt:hover{box-shadow:0 0 0 2px var(--moss)}
-.opt b{font-weight:600}
-.opt .lg{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--sage);margin-left:6px}
-.opt p{font-size:.8rem;color:var(--ink2);margin-top:2px}
-.status{font-size:.8rem;color:var(--ink3);margin-top:8px}
+.opt b{font-weight:600;font-size:.95rem;display:block}
+.opt p{font-size:.76rem;color:var(--ink2);margin-top:2px;line-height:1.35}
+.opt .src{font-size:.62rem;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em}
+.tr .go{display:flex;align-items:center;gap:10px;margin-top:10px}
+.status{font-size:.78rem;color:var(--ink3)}
 .status.err{color:var(--clay)}
+.empty-out{font-size:.8rem;color:var(--ink3);padding:4px 2px}
 
 /* side "find a word" panel */
 .help .field input{padding:11px 14px;font-size:.88rem}

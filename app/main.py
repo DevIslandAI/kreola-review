@@ -127,15 +127,19 @@ def put_clip(clip_id: str, s: ClipState):
     return {"ok": True}
 
 
-@app.get("/api/dict")
-def dict_search(q: str, lang: str = "mfe"):
-    if lang not in lookup.LANGS:
+@app.get("/api/translate")
+def translate(q: str, src: str = "fr", lang: str = "mfe"):
+    """Instant translations from the dictionary (free); Claude is only called by POST /api/ask."""
+    if src not in lookup.LANGS or lang not in lookup.LANGS:
         raise HTTPException(400)
-    return lookup.search(q, lang)
+    own = lookup.kreol_hits(q, 1) if src == "mfe" else []
+    return {"source_definition": own[0]["en"] if own and lookup.fold(own[0]["w"]) == lookup.fold(q) else "",
+            "options": lookup.translate_local(q, src, lang)}
 
 
 class Ask(BaseModel):
     q: str
+    src: str = "fr"
     lang: str
     context: str = ""
     clip_id: str = ""
@@ -143,17 +147,17 @@ class Ask(BaseModel):
 
 @app.post("/api/ask")
 def ask(a: Ask):
-    if a.lang not in lookup.LANGS or not a.q.strip():
+    if a.lang not in lookup.LANGS or a.src not in lookup.LANGS or not a.q.strip():
         raise HTTPException(400)
     try:
-        lid, options = lookup.ask(a.q.strip()[:200], a.lang, a.context[:600], a.clip_id)
+        lid, sdef, options = lookup.ask(a.q.strip()[:200], a.src, a.lang, a.context[:600], a.clip_id)
     except lookup.BudgetReached as e:
         raise HTTPException(402, str(e))
     except anthropic.RateLimitError:
         raise HTTPException(429, "Claude is busy, try again in a minute")
     except (anthropic.APIConnectionError, anthropic.APIStatusError) as e:
         raise HTTPException(502, f"Claude is unavailable ({getattr(e, 'status_code', 'network')})")
-    return {"id": lid, "options": options, "spent": store.spent(), "budget": CLAUDE_MAX_USD}
+    return {"id": lid, "source_definition": sdef, "options": options, "spent": store.spent(), "budget": CLAUDE_MAX_USD}
 
 
 class Choose(BaseModel):

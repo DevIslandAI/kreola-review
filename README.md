@@ -10,8 +10,12 @@ Works on a laptop and on a phone. Three screens:
   - Click a word to hear only that word.
   - Double-click a word to open its card:
     1. **Correct word**: type the right word(s), or remove a word that was never said.
-    2. **Find a word**: choose Kreol, French or English, then type a word, a meaning or what you hear.
-       Dictionary matches appear instantly; **Ask** sends it to Claude for spellings, translations and misheard words.
+    2. **Translate a word**: a translator with your word and its language on the left (Kreol, French or English)
+       and the translation in the language you choose on the right, plus a ⇄ swap button.
+       - Dictionary translations appear instantly and cost nothing.
+       - **Translate** asks Claude.
+       - Every word, including yours, gets a definition tagged with its language, or *Don't know*.
+       - Tap a translation to put it in the correct-word box.
     3. **Comment**: quick reasons, a typed comment, or a voice note (transcribed automatically).
   - Each clip also has a comment, a *before and after* view, and *Clip is correct* / *Save & next clip*.
 - **Learning**: why words were fixed, the most common fixes, rules proposed from repeated fixes, and Claude spending.

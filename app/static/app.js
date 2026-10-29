@@ -119,17 +119,15 @@ async function review(id, start) {
   <div class="rvhead"><a class="back" href="#/"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Recordings</a>
     <h1>${esc(EX.title)}</h1>
     <div class="meta" style="margin-top:6px"><span>${nice(EX.category)}</span><i></i><span>${fmt(EX.duration)}</span><i></i><span>${EX.clips.length} clips</span><i></i><span><span class="dot ${EX.difficulty}"></span>${DIFF[EX.difficulty]}</span><i></i><span>${langs(EX)}</span>
-      <button class="btn quiet helpbtn" id="helpbtn" style="margin-left:auto;padding:6px 10px">Find a word</button></div></div>
+      <button class="btn quiet helpbtn" id="helpbtn" style="margin-left:auto;padding:6px 10px">Translate</button></div></div>
   <div class="rv">
     <nav class="card rail" id="rail" aria-label="Clips"></nav>
     <div class="card" id="clipcard"></div>
-    <aside class="card help" id="help"><div style="display:flex;align-items:center"><h2 style="margin:0">Find a word</h2><button class="btn quiet helpbtn" id="helpx" style="margin-left:auto;padding:4px 10px">Close</button></div>
-      <div class="seg" id="hlang" style="margin-top:14px"><button data-l="mfe" class="on">Kreol</button><button data-l="fr">French</button><button data-l="en">English</button></div>
-      <div class="field" style="margin-top:10px"><input id="hq" autocomplete="off" placeholder="A word, a meaning or what you hear"><button class="btn primary small" id="hask">Ask</button></div>
-      <div class="hits" id="hhits"></div><div class="opts" id="hopts"></div><div class="status" id="hstatus"></div>
+    <aside class="card help" id="help"><div style="display:flex;align-items:center"><h2 style="margin:0">Translate</h2><button class="btn quiet helpbtn" id="helpx" style="margin-left:auto;padding:4px 10px">Close</button></div>
+      <div class="tr" id="htr" style="margin-top:14px"></div>
       <p class="hint" style="margin-top:14px">Tap a result to copy it. To change a word in the text, double-click the word.</p></aside>
   </div></section>`;
-  finder({lang: '#hlang', q: '#hq', ask: '#hask', hits: '#hhits', opts: '#hopts', status: '#hstatus', use: w => { navigator.clipboard?.writeText(w); toast(`Copied “${w}”`); }});
+  translator($('#htr'), w => { navigator.clipboard?.writeText(w); toast(`Copied “${w}”`); });
   $('#helpbtn').onclick = () => $('#help').classList.add('on'); $('#helpx').onclick = () => $('#help').classList.remove('on');
   load(cur);
 }
@@ -222,7 +220,7 @@ async function finished() {
     <div style="display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap"><a class="btn ghost" href="#/">All recordings</a>${n ? `<a class="btn primary" href="#/r/${encodeURIComponent(n.id)}">Next recording →</a>` : ''}</div></div>`;
 }
 
-/* ───── word card: 1 correct, 2 find, 3 comment ───── */
+/* ───── word card: 1 correct, 2 translate, 3 comment ───── */
 let cj = null, draft = null;
 function openCard(j) {
   const t = C().tokens[j], e = S().edits[j] || {};
@@ -230,15 +228,14 @@ function openCard(j) {
   $$('#text .w').forEach(el => el.classList.toggle('sel', +el.dataset.j === j));
   $('#wcword').textContent = t.t; $('#wcwhen').textContent = `myt wrote this · at ${fmt(C().offset + t.s)}`;
   $('#wcin').value = shown_(t, j); $('#wcnote').value = e.note || '';
-  $('#wcq').value = shown_(t, j); $('#wcopts').innerHTML = ''; $('#wcstatus').textContent = ''; $('#wcstatus').className = 'status';
-  cardFinder.search();
+  cardTr.reset();
   $('#wcchips').innerHTML = WORD_WHY.map(w => `<button class="chip ${draft.why.includes(w) ? 'on' : ''}">${w}</button>`).join('');
   $$('#wcchips .chip').forEach(b => b.onclick = () => { const k = draft.why.indexOf(b.textContent); k < 0 ? draft.why.push(b.textContent) : draft.why.splice(k, 1); b.classList.toggle('on'); });
   $('#wcrm').textContent = draft.gone ? 'Put this word back' : 'Remove this word (not said)';
   voiceList($('#wcvoice'), wordVoice(j));
   const wc = $('#wc');
   if (!phone()) {
-    const el = $(`#text .w[data-j="${j}"]`), W = 380, H = Math.min(wc.scrollHeight || 600, innerHeight * .82);
+    const el = $(`#text .w[data-j="${j}"]`), W = 440, H = Math.min(wc.scrollHeight || 600, innerHeight * .82);
     let r = el.getBoundingClientRect();
     if (r.bottom + H + 20 > innerHeight && r.top - H - 20 < 70) { scrollBy(0, r.bottom + H + 24 - innerHeight); r = el.getBoundingClientRect(); }
     const left = Math.max(12, Math.min(innerWidth - W - 12, r.left + r.width / 2 - W / 2)), below = r.bottom + H + 20 <= innerHeight;
@@ -265,39 +262,54 @@ $('#wchear').onclick = () => hear(cj);
 $('#wcrm').onclick = () => { draft.gone = !draft.gone; if (draft.gone) saveCard(); else $('#wcrm').textContent = 'Remove this word (not said)'; };
 addEventListener('keydown', e => { if (e.key === 'Escape') { closeCard(); $('#help')?.classList.remove('on'); } });
 
-/* find a word: instant dictionary matches while typing; "Ask" sends it to Claude (meaning, translation, misheard word) */
-function finder(o) {
-  let lang = 'mfe', timer;
-  const f = {
-    search() {
-      clearTimeout(timer); const q = $(o.q).value.trim();
-      if (!q) { $(o.hits).innerHTML = ''; return; }
-      timer = setTimeout(async () => {
-        const hits = await api(`dict?q=${encodeURIComponent(q)}&lang=${lang}`).catch(() => []);
-        $(o.hits).innerHTML = hits.map(h => `<button class="hit" data-w="${esc(h.w)}" title="${esc([h.en, h.fr].filter(Boolean).join(' / '))}">${esc(h.w)}${h.en ? `<small>${esc(String(h.en).slice(0, 28))}</small>` : ''}</button>`).join('');
-        $$(o.hits + ' .hit').forEach(b => b.onclick = () => o.use(b.dataset.w));
-      }, 120);
-    },
-    async ask() {
-      const q = $(o.q).value.trim(); if (!q) return;
-      $(o.status).className = 'status'; $(o.status).textContent = 'Asking Claude…'; $(o.ask).disabled = true; $(o.opts).innerHTML = '';
-      try {
-        const ctx = EX ? C().tokens.map((t, i) => shown_(t, i)).join(' ') : '';
-        const r = await api('ask', {method: 'POST', body: {q, lang, context: ctx, clip_id: EX ? C().clip_id : ''}});
-        $(o.opts).innerHTML = r.options.map((x, i) => `<button class="opt" data-i="${i}"><b>${esc(x.text)}</b><span class="lg">${{mfe: 'Kreol', fr: 'French', en: 'English'}[x.lang]}</span><p>${esc(x.note)}</p></button>`).join('') || '<p class="empty">No suggestion.</p>';
-        $$(o.opts + ' .opt').forEach(b => b.onclick = () => { const x = r.options[+b.dataset.i]; o.use(x.text); if (r.id) api('ask/choose', {method: 'POST', body: {id: r.id, text: x.text}}).catch(() => {}); });
-        $(o.status).textContent = `Claude used $${r.spent.toFixed(2)} of $${r.budget.toFixed(2)}`;
-      } catch (e) { $(o.status).className = 'status err'; $(o.status).textContent = e.message; }
-      $(o.ask).disabled = false;
-    }};
-  $$(o.lang + ' button').forEach(b => b.onclick = () => { lang = b.dataset.l; $$(o.lang + ' button').forEach(x => x.classList.toggle('on', x === b)); f.search(); });
-  $(o.q).oninput = f.search;
-  $(o.q).onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); f.ask(); } if (e.key === 'Escape') closeCard(); };
-  $(o.ask).onclick = f.ask;
-  return f;
+/* translator: your word on the left (its language), the translation on the right (the language you want).
+   Dictionary results appear while typing; "Translate" asks Claude. Every word gets a definition, or "Don't know". */
+const LN = {mfe: 'Kreol', fr: 'French', en: 'English'};
+const fold = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+const defHtml = (lang, d) => !d ? '' : `<span class="lg">${LN[lang]}</span>${/^don.?t know/i.test(d) ? '<span class="dk">Don’t know</span>' : esc(d)}`;
+function translator(box, use) {
+  const sel = v => Object.entries(LN).map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${l}</option>`).join('');
+  box.innerHTML = `<div class="sides">
+      <div class="side"><select class="from" aria-label="From">${sel('fr')}</select><textarea class="q" rows="2" placeholder="Type a word"></textarea><div class="def sdef"></div></div>
+      <button class="swap" title="Swap languages" aria-label="Swap languages">⇄</button>
+      <div class="side out"><select class="to" aria-label="To">${sel('mfe')}</select><div class="opts"></div></div></div>
+    <div class="go"><button class="btn primary small ask">Translate</button><span class="status"></span></div>`;
+  const [q, from, to, out, sdef, st, ask, swap] = ['.q', '.from', '.to', '.opts', '.sdef', '.status', '.ask', '.swap'].map(c => box.querySelector(c));
+  let local = {source_definition: '', options: []}, ai = null, timer;
+  function render() {
+    const seen = new Set(), list = [...(ai?.options || []), ...local.options].filter(x => !seen.has(fold(x.text)) && seen.add(fold(x.text)));
+    out.innerHTML = list.map((x, i) => `<button class="opt" data-i="${i}"><b>${esc(x.text)}</b><p class="${/^don.?t know/i.test(x.definition) ? 'dk' : ''}">${defHtml(x.lang, x.definition)}</p>${x.from === 'dictionary' ? '<span class="src">from the dictionary</span>' : ''}</button>`).join('')
+      || `<div class="empty-out">${q.value.trim() ? (ai ? 'No translation found.' : 'Press Translate.') : 'The translation appears here.'}</div>`;
+    out.querySelectorAll('.opt').forEach(b => b.onclick = () => { const x = list[+b.dataset.i]; use(x.text);
+      if (ai?.id && x.from !== 'dictionary') api('ask/choose', {method: 'POST', body: {id: ai.id, text: x.text}}).catch(() => {}); });
+    const d = ai?.source_definition || local.source_definition;
+    sdef.innerHTML = q.value.trim() ? defHtml(from.value, d) : '';
+  }
+  function instant() {
+    clearTimeout(timer); ai = null; st.textContent = ''; st.className = 'status';
+    const v = q.value.trim(); if (!v) { local = {source_definition: '', options: []}; return render(); }
+    timer = setTimeout(async () => { local = await api(`translate?q=${encodeURIComponent(v)}&src=${from.value}&lang=${to.value}`).catch(() => local); render(); }, 150);
+  }
+  async function translate() {
+    const v = q.value.trim(); if (!v) return q.focus();
+    st.className = 'status'; st.textContent = 'Translating…'; ask.disabled = true;
+    try {
+      const ctx = EX && $('#text') ? C().tokens.map((t, i) => shown_(t, i)).join(' ') : '';
+      ai = await api('ask', {method: 'POST', body: {q: v, src: from.value, lang: to.value, context: ctx, clip_id: EX ? C().clip_id : ''}});
+      st.textContent = `Claude: $${ai.spent.toFixed(2)} of $${ai.budget.toFixed(0)} used`;
+    } catch (e) { st.className = 'status err'; st.textContent = e.message; }
+    ask.disabled = false; render();
+  }
+  const fix = changed => { if (from.value === to.value) (changed === from ? to : from).value = Object.keys(LN).find(k => k !== from.value); instant(); };
+  from.onchange = () => fix(from); to.onchange = () => fix(to);
+  swap.onclick = () => { const first = out.querySelector('.opt b')?.textContent; [from.value, to.value] = [to.value, from.value]; if (first) q.value = first; instant(); };
+  q.oninput = instant;
+  q.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); translate(); } if (e.key === 'Escape') closeCard(); };
+  ask.onclick = translate;
+  render();
+  return {reset() { q.value = ''; local = {source_definition: '', options: []}; ai = null; st.textContent = ''; render(); }};
 }
-const cardFinder = finder({lang: '#wclang', q: '#wcq', ask: '#wcask', hits: '#wchits', opts: '#wcopts', status: '#wcstatus',
-  use: w => { $('#wcin').value = w; $('#wcin').focus(); toast(`“${w}” put in the correct word box`); }});
+const cardTr = translator($('#wctr'), w => { $('#wcin').value = w; $('#wcin').focus(); toast(`“${w}” put in the correct word box`); });
 
 /* voice notes: recorded in the browser, stored and transcribed on the server (myt, English/French) */
 let rec = null;
