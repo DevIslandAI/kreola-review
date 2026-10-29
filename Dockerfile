@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 
 # /data is a persistent volume: review_set.json + audio/ (copied once) and reviews.db + voice/ (written by the app)
-ENV DATA_DIR=/data HOSTED=1 PYTHONUNBUFFERED=1
+ENV DATA_DIR=/data HOSTED=1 PYTHONUNBUFFERED=1 HF_HUB_DISABLE_PROGRESS_BARS=1
 VOLUME /data
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]

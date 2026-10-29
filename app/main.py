@@ -4,6 +4,7 @@
 """
 import hmac
 import json
+import time
 from collections import defaultdict
 from datetime import datetime
 
@@ -14,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import bootstrap, lookup, store, voice
+from . import backup, bootstrap, lookup, store, voice
 from .config import CLAUDE_MAX_USD, DATA_DIR, HOSTED, PASSWORD, REVIEWER, ROOT, SESSION_SECRET
 
 bootstrap.ensure_data()  # a new server fetches the review set and audio from Hugging Face once
@@ -214,4 +215,20 @@ def export():
     return "\n".join(lines) + "\n"
 
 
+_last_manual = [0.0]
+
+
+@app.post("/api/backup")
+def backup_now():
+    """Back up now (at most once every 10 minutes); the nightly one runs by itself."""
+    if time.time() - _last_manual[0] < 600:
+        raise HTTPException(429, "A backup ran less than 10 minutes ago")
+    _last_manual[0] = time.time()
+    try:
+        return {"status": backup.run("manual", export)}
+    except Exception as e:
+        raise HTTPException(502, f"Backup failed: {e!r}"[:300])
+
+
+backup.start(export)  # nightly at 03:00 Mauritius time, and a few minutes after each start
 app.mount("/", StaticFiles(directory=ROOT / "static", html=True), name="static")

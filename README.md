@@ -71,8 +71,30 @@ Then open http://localhost:8770. Keys are read from the Windows user environment
    review set and its audio (~210 MB, about 2 minutes) from the private dataset `devislandai/kreola-speech`
    (`05_review/platform/`), using `HF_TOKEN`. Later starts reuse what is on the volume.
 4. **Domain:** set the domain with HTTPS on, pointing to port `8000`.
-5. **Backup:** `reviews.db` and `voice/` in `/data` are your work. Back them up; `GET /api/export` also gives all
-   reviews as JSON lines.
+5. **Backups are automatic.** See below.
+
+## Backups and restoring
+
+**When it runs:** every night at 03:00 Mauritius time, and 5 minutes after each start or redeploy. It is skipped when
+nothing has changed.
+
+**Where it goes:** the private dataset `devislandai/kreola-speech`, under `05_review/platform/backups/`.
+- `<YYYY-MM-DD_HHMM>/reviews.db` is a full snapshot of the database. Old copies are kept, so you can go back to any
+  earlier night.
+- `<YYYY-MM-DD_HHMM>/reviews.jsonl` holds the same reviews as readable lines.
+- `voice/` holds every voice note, each uploaded once.
+
+**Token:** it needs `HF_TOKEN` (or `HF_BACKUP_TOKEN`) with **write** access to the dataset. With a read-only token the
+app still works, but its log shows `backup FAILED`.
+
+**To check it:** look in the server log for `backup done …`. `POST /api/backup` runs one right away, at most once every
+10 minutes.
+
+**To restore:**
+1. In EasyPanel, stop the app.
+2. In the `/data` volume, replace `reviews.db` with the chosen backup's `reviews.db`, and copy back the files from
+   `backups/voice/` into `voice/`.
+3. Start the app again.
 
 ## Costs
 
