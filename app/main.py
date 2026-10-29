@@ -14,9 +14,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import lookup, store, voice
+from . import bootstrap, lookup, store, voice
 from .config import CLAUDE_MAX_USD, DATA_DIR, HOSTED, PASSWORD, REVIEWER, ROOT, SESSION_SECRET
 
+bootstrap.ensure_data()  # a new server fetches the review set and audio from Hugging Face once
 SET = json.loads((DATA_DIR / "review_set.json").read_text(encoding="utf-8"))
 EXCERPTS = {e["id"]: e for e in SET["excerpts"]}
 CLIPS = {c["clip_id"]: (e, c) for e in SET["excerpts"] for c in e["clips"]}

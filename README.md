@@ -67,11 +67,9 @@ Then open http://localhost:8770. Keys are read from the Windows user environment
 2. **Environment:** add the variables listed in `.env.example`. `REVIEW_PASSWORD` and `SESSION_SECRET` are
    required: the app refuses to start without them, because otherwise anyone could hear the audio and spend the
    Claude credit.
-3. **Storage:** add a volume mounted at `/data`. Copy into it once:
-   - `review_set.json`;
-   - the `audio/` folder from `kreola-data/00_review/platform/data/`.
-
-   EasyPanel's file browser works, or `scp`.
+3. **Storage:** add a volume mounted at `/data`. Nothing to copy by hand: on its first start the app downloads the
+   review set and its audio (~210 MB, about 2 minutes) from the private dataset `devislandai/kreola-speech`
+   (`05_review/platform/`), using `HF_TOKEN`. Later starts reuse what is on the volume.
 4. **Domain:** set the domain with HTTPS on, pointing to port `8000`.
 5. **Backup:** `reviews.db` and `voice/` in `/data` are your work. Back them up; `GET /api/export` also gives all
    reviews as JSON lines.
