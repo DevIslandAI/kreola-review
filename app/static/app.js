@@ -4,6 +4,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const hm = h => `${Math.floor(h)} h ${String(Math.round(h % 1 * 60)).padStart(2, '0')}`;  // non-breaking: "10 h 02" never splits
 const phone = () => matchMedia('(max-width:720px)').matches;
+const TOUCH = matchMedia('(pointer:coarse)').matches, TAP = TOUCH ? 'Tap' : 'Click', TAP2 = TOUCH ? 'Double-tap' : 'Double-click';
 const LANG = {mfe_Latn: 'Kreol', fra_Latn: 'French', eng_Latn: 'English'};
 const DIFF = {hard: 'Hard', typ: 'Typical', easy: 'Easy'};
 const nice = s => { s = String(s).replace(/_/g, ' '); return s[0].toUpperCase() + s.slice(1); };
@@ -173,7 +174,7 @@ async function review(id, start) {
     <a class="back" href="#/c/${encodeURIComponent(EX.category)}" title="Back to ${nice(EX.category)}"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${nice(EX.category)}</span></a>
     <div class="rvt" title="${esc(EX.title)}"><b>${esc(EX.title)}</b><span class="meta"><span>${fmt(EX.duration)}</span><i></i><span><span class="dot ${EX.difficulty}"></span>${DIFF[EX.difficulty]}</span><i></i><span>${langs(EX)}</span></span></div>
     <div class="rvnav"><button class="nb" id="prevc" aria-label="Previous clip">‹</button><span id="clipno"></span><button class="nb" id="nextc" aria-label="Next clip">›</button></div>
-    <button class="btn quiet helpbtn" id="helpbtn">Translate</button>
+    <button class="btn quiet helpbtn" id="helpbtn" title="Translate / find a word"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h8M8 3v2M6 5c0 4 2 7 6 9M10 5c0 3-2 6-6 8"/><path d="m13 21 4-9 4 9M14.5 18h5"/></svg><span class="tw">Translate</span></button>
     <button class="btn quiet" id="skip">Skip</button>
     <button class="btn primary" id="ok">✓ <span id="okl">Clip is correct</span></button>
   </div>
@@ -204,12 +205,15 @@ function load(i) {
       <div class="track"><div class="scrub" id="scrub"><div id="ticks"></div><div class="hl" id="hl"></div></div><div class="times"><span id="tcur">0:00</span><span>${fmt(C().dur)}</span></div></div>
       <div class="speed" id="speed"><button data-r=".75">0.75×</button><button data-r="1" class="on">1×</button></div></div>
     <div class="text" id="text"></div>
-    <p class="hint">Click a word to hear it. Double-click to correct it, find the right word or comment.</p>
-    <div class="keyline"><span><u style="border-bottom:2px dotted var(--sage)"></u>Auto-fixed, check it</span><span><u style="border-bottom:2px solid var(--sand)"></u>Worth a second listen</span><span><u style="border-bottom:2px solid var(--sage-d)"></u>Your change</span><span><span class="dot" style="background:var(--flag)"></span>Your comment</span></div>
+    <div class="howto"><span class="hp"><svg width="14" height="14" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg>${TAP} a word to hear it</span>
+      <span class="hp"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>${TAP2} to fix, translate or comment</span>
+      <span class="legend3"><span><u></u>Your change</span><span><span class="dot" style="background:var(--flag)"></span>Your comment</span></span></div>
     <div class="sect"><h3>Comment on the whole clip</h3><div class="chips" id="clipchips"></div>
       <div class="field" style="margin-top:12px"><input id="clipnote" placeholder="Anything about this clip"><button class="mic" id="clipmic" title="Record a voice note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button></div>
       <div id="clipvoice"></div></div>
-    <div class="sect"><h3>Before and after</h3><div class="cmp"><div><small>myt wrote</small><span id="before"></span></div><div><small>Your version</small><span id="after"></span></div></div></div>`;
+    <div class="sect"><h3>Before and after</h3><div class="cmp"><div class="pane"><small>myt wrote</small><p id="before"></p></div>
+      <span class="arrow" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      <div class="pane now"><small>Your version</small><p id="after"></p></div></div></div>`;
   $('#play').onclick = () => { if (audio.paused) playClip(); else stopAudio(); };
   $('#scrub').onpointerdown = e => { const r = e.currentTarget.getBoundingClientRect(); heardJ = null; audio.currentTime = C().offset + Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * C().dur; stopAt = C().offset + C().dur; };
   $$('#speed button').forEach(b => b.onclick = () => { audio.playbackRate = +b.dataset.r; $$('#speed button').forEach(x => x.classList.toggle('on', x === b)); });
@@ -219,7 +223,7 @@ function load(i) {
   $('#clipnote').oninput = e => { S().note = e.target.value; clearTimeout(load.t); load.t = setTimeout(save, 700); };
   $('#clipmic').onclick = () => record($('#clipmic'), null, () => voiceList($('#clipvoice'), C().voice.filter(v => v.word == null)));
   voiceList($('#clipvoice'), C().voice.filter(v => v.word == null));
-  $('#clipno').textContent = `Clip ${cur + 1} of ${EX.clips.length}`; $('#prevc').disabled = cur === 0; $('#nextc').disabled = cur === EX.clips.length - 1;
+  $('#clipno').innerHTML = `<span class="cw">Clip ${cur + 1} of ${EX.clips.length}</span><span class="cs">${cur + 1}/${EX.clips.length}</span>`; $('#prevc').disabled = cur === 0; $('#nextc').disabled = cur === EX.clips.length - 1;
   $('#ok').hidden = $('#skip').hidden = false;
   history.replaceState(null, '', `#/r/${encodeURIComponent(EX.id)}/${cur}`);
   audio.currentTime = C().offset;
@@ -228,13 +232,14 @@ function load(i) {
 function text() {
   const toks = C().tokens;
   $('#text').innerHTML = toks.map((t, i) => { const e = S().edits[i] || {};
-    const cls = e.gone ? 'gone' : mine(t, i) ? 'mine' : t.auto ? 'fix' : t.low ? 'low' : '';
+    const cls = e.gone ? 'gone' : mine(t, i) ? 'mine' : '';
     return `<span class="w ${cls}${flagged(i) ? ' flagged' : ''}" data-j="${i}">${esc(shown_(t, i))}</span>`; }).join(' ');
   $$('#text .w').forEach(el => el.onclick = () => { const j = +el.dataset.j, now = Date.now();  // one tap: hear it; second tap: open its card
     if (lastTap.j === j && now - lastTap.t < 350) { lastTap = {}; openCard(j); } else { lastTap = {j, t: now}; hear(j); } });
-  $('#okl').textContent = toks.some((t, i) => mine(t, i)) ? 'Save & next clip' : 'Clip is correct';
+  const ch = toks.some((t, i) => mine(t, i));  // shorter labels on a phone so the header stays two rows
+  $('#okl').textContent = phone() ? (ch ? 'Save & next' : 'Correct') : (ch ? 'Save & next clip' : 'Clip is correct');
   $('#ticks').innerHTML = toks.map((t, i) => `<i class="${flagged(i) || mine(t, i) ? 'flag' : ''}" style="left:${t.s / C().dur * 100}%;height:${8 + ((t.t.length * 7) % 18)}px"></i>`).join('');
-  $('#before').innerHTML = toks.map((t, i) => mine(t, i) ? `<span class="was">${esc(t.t)}</span>` : esc(t.t)).join(' ');
+  $('#before').innerHTML = toks.map((t, i) => mine(t, i) || t.auto ? `<span class="was">${esc(t.t)}</span>` : esc(t.t)).join(' ');
   const notes = [];
   $('#after').innerHTML = toks.map((t, i) => { const e = S().edits[i] || {}; if (e.gone) return null;
     let h = mine(t, i) || t.auto ? `<span class="now2">${esc(shown_(t, i))}</span>` : esc(shown_(t, i));
@@ -403,7 +408,22 @@ async function record(btn, word, after) {
   };
   rec.start(); btn.classList.add('rec'); toast('Recording… tap the mic again to stop');
 }
-function voiceList(el, arr) { el.innerHTML = arr.map(v => `<div class="vnote"><audio controls preload="none" src="api/voice/${v.id}"></audio><span>${v.transcript ? `<em>“${esc(v.transcript)}”</em>` : 'No transcript'}</span></div>`).join(''); }
+const vAudio = new Audio(); let vBtn = null;
+const PLAYI = '<svg width="14" height="14" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg>', PAUSEI = '<svg width="14" height="14" viewBox="0 0 20 20"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/></svg>';
+vAudio.ontimeupdate = () => { const bar = vBtn?.closest('.vcard')?.querySelector('.vbar i'), t = vBtn?.closest('.vcard')?.querySelector('.vtime');
+  if (bar && isFinite(vAudio.duration)) bar.style.width = vAudio.currentTime / vAudio.duration * 100 + '%'; if (t) t.textContent = fmt(vAudio.currentTime); };
+vAudio.onended = vAudio.onpause = () => { if (vBtn) vBtn.innerHTML = PLAYI; };
+function voiceList(el, arr) {
+  el.innerHTML = arr.map(v => `<div class="vcard"><button class="vplay" data-id="${v.id}" aria-label="Play voice note">${PLAYI}</button>
+    <div class="vbody"><div class="vtop"><span class="vlabel"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Voice note</span><span class="vtime">0:00</span></div>
+      <div class="vbar"><i></i></div>
+      ${v.transcript ? `<p class="vtext">${esc(v.transcript)}</p>` : '<p class="vtext none">No transcript (the note is kept)</p>'}</div></div>`).join('');
+  el.querySelectorAll('.vplay').forEach(b => b.onclick = () => {
+    if (vBtn === b && !vAudio.paused) return vAudio.pause();
+    if (vBtn !== b) { if (vBtn) vBtn.innerHTML = PLAYI; vBtn = b; vAudio.src = `api/voice/${b.dataset.id}`; }
+    audio.pause(); vAudio.play().then(() => b.innerHTML = PAUSEI).catch(() => {});
+  });
+}
 $('#wcmic').onclick = () => record($('#wcmic'), cj, () => voiceList($('#wcvoice'), wordVoice(cj)));
 
 /* ───── learning ───── */
