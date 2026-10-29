@@ -5,13 +5,16 @@ golden dataset, and they teach Claude how to correct the other ~90 hours the sam
 
 Works on a laptop and on a phone. Three screens:
 
-- **Overview**: progress out of 10 h, the share of each recording type, and every recording with its status.
+- **Overview**: progress out of 10 h, the share of each recording type, and the recordings grouped by **category** (tiles
+  grouped by family, each with its progress). A category page lists its recordings with clips done, and *Start / Continue*
+  and *Next recording* stay in that category.
 - **Review**: the clip plays and its words light up as they are spoken.
   - Click a word to hear only that word.
   - Double-click a word to open its card:
     1. **Correct word**: type the right word(s), or remove a word that was never said.
-    2. **Translate a word**: a translator with your word and its language on the left (Kreol, French or English)
-       and the translation in the language you choose on the right, plus a ⇄ swap button.
+    2. **Translate / Find a word**: say which language you write in (Kreol, French or English).
+       - *Translate* gives the word in the language you choose, on the right, with a ⇄ swap button.
+       - *Find* searches within your own language: input that is misspelled, written as it sounds, or a meaning.
        - Dictionary translations appear instantly and cost nothing.
        - **Translate** asks Claude.
        - Every word, including yours, gets a definition tagged with its language, or *Don't know*.

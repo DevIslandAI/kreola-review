@@ -26,15 +26,17 @@ async function route() {
   closeCard(); stopAudio();
   const h = location.hash.replace(/^#\/?/, '').split('/');
   $$('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === ({r: 'review', review: 'review', learning: 'learning'}[h[0]] || 'overview')));
+  if (h[0] !== 'c') filter = 'all';
   try {
     if (h[0] === 'learning') return learning();
+    if (h[0] === 'c' && h[1]) return category(decodeURIComponent(h[1]));
     if (h[0] === 'r' && h[1]) return review(decodeURIComponent(h[1]), +h[2] || 0);
     if (h[0] === 'review') { OV = await api('overview'); const n = nextUp(OV); return n ? (location.hash = `#/r/${n.id}`) : overview(); }
     return overview();
   } catch (e) { if (e.message !== 'login') $('#main').innerHTML = `<div class="card" style="margin-top:24px">Something went wrong: ${esc(e.message)}</div>`; }
 }
 addEventListener('hashchange', route);
-function nextUp(ov) { return ov.excerpts.find(e => e.status === 'half') || ov.excerpts.find(e => e.status === 'todo'); }
+function nextUp(ov, cat) { const xs = ov.excerpts.filter(e => !cat || e.category === cat); return xs.find(e => e.status === 'half') || xs.find(e => e.status === 'todo'); }
 function pill(ov) { $('#pill').innerHTML = `<b>${hm(ov.hours_done)}</b> of ${Math.round(ov.hours_total)} h reviewed`; }
 
 /* ───── login ───── */
@@ -77,23 +79,56 @@ async function overview() {
     <div class="card"><h2>Progress by mix</h2>${row('Kreol', 'mfe_Latn')}${row('French', 'fra_Latn')}${row('English', 'eng_Latn')}<div style="height:8px"></div>
       ${row('<span class="dot hard"></span>Hard', 'hard')}${row('<span class="dot typ"></span>Typical', 'typ')}${row('<span class="dot easy"></span>Easy', 'easy')}</div>
   </div>
+  <div class="card" style="margin-top:20px"><h2>Recordings by category</h2><div id="cats"></div></div></section>`;
+  $$('.stack i').forEach(el => el.onclick = () => { const on = el.classList.contains('on'); $$('.stack i').forEach(x => x.classList.remove('on')); if (!on) el.classList.add('on'); });
+  cats();
+}
+/* categories: tiles grouped by family, each with its clip progress; a tile opens the category page */
+function catStats() {
+  const c = {};
+  for (const e of OV.excerpts) {
+    const x = c[e.category] ??= {cat: e.category, family: e.family, recs: 0, recsDone: 0, clips: 0, clipsDone: 0, hours: 0};
+    x.recs++; x.recsDone += e.status === 'done'; x.clips += e.clips; x.clipsDone += e.done; x.hours += e.duration / 3600;
+  }
+  return Object.values(c);
+}
+function cats() {
+  const st = catStats(), fams = {};
+  st.forEach(x => (fams[x.family] ??= []).push(x));
+  const order = Object.entries(fams).sort((a, b) => b[1].reduce((s, x) => s + x.hours, 0) - a[1].reduce((s, x) => s + x.hours, 0));
+  $('#cats').innerHTML = order.map(([f, xs]) => `<div class="fam"><h3>${nice(f)}</h3><div class="tiles">${xs.sort((a, b) => b.hours - a.hours).map(x => {
+    const p = Math.round(x.clipsDone / x.clips * 100);
+    return `<a class="tile ${p === 100 ? 'done' : ''}" href="#/c/${encodeURIComponent(x.cat)}"><b>${nice(x.cat)}</b>
+      <span class="tm">${x.recs} recording${x.recs > 1 ? "s" : ""} · ${hm(x.hours)}</span><div class="bar"><i style="width:${p}%"></i></div>
+      <span class="tp">${p === 100 ? '✓ Done' : p ? `${p}% · ${x.recsDone} of ${x.recs} done` : 'Not started'}</span></a>`; }).join('')}</div></div>`).join('');
+}
+/* one category: every recording in it, with what is done and what is not */
+async function category(cat) {
+  OV = await api('overview'); pill(OV);
+  const x = catStats().find(s => s.cat === cat);
+  if (!x) return (location.hash = '#/');
+  const next = nextUp(OV, cat), p = Math.round(x.clipsDone / x.clips * 100);
+  $('#main').innerHTML = `<section class="screen">
+  <div class="rvhead"><a class="back" href="#/"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Overview</a>
+    <h1>${nice(cat)}</h1><div class="meta" style="margin-top:6px"><span>${nice(x.family)}</span><i></i><span>${x.recs} recording${x.recs > 1 ? "s" : ""}</span><i></i><span>${hm(x.hours)}</span><i></i><span>${x.clips} clips</span></div></div>
+  <div class="card catbar"><div style="flex:1"><div class="rowbar" style="margin:0;grid-template-columns:1fr 150px"><div class="bar"><i style="width:${p}%"></i></div><span class="n">${x.clipsDone} of ${x.clips} clips · ${p}%</span></div></div>
+    ${next ? `<a class="btn primary" href="#/r/${encodeURIComponent(next.id)}">${next.status === 'half' ? 'Continue' : 'Start'} →</a>` : '<span class="tag">✓ All done</span>'}</div>
   <div class="card" style="margin-top:20px">
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"><h2 style="margin:0">Recordings</h2>
       <div class="seg" id="filter" style="margin-left:auto">${[['all', 'All'], ['todo', 'To do'], ['half', 'Started'], ['done', 'Done']].map(([k, l]) => `<button data-f="${k}" class="${filter === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
     <div class="list" id="list"></div><div class="more" id="more"></div>
   </div></section>`;
-  $$('.stack i').forEach(el => el.onclick = () => { const on = el.classList.contains('on'); $$('.stack i').forEach(x => x.classList.remove('on')); if (!on) el.classList.add('on'); });
-  $$('#filter button').forEach(b => b.onclick = () => { filter = b.dataset.f; shown = 40; $$('#filter button').forEach(x => x.classList.toggle('on', x === b)); list(); });
-  list();
+  $$('#filter button').forEach(b => b.onclick = () => { filter = b.dataset.f; shown = 40; $$('#filter button').forEach(y => y.classList.toggle('on', y === b)); list(cat); });
+  list(cat);
 }
-function list() {
-  const all = OV.excerpts.filter(e => filter === 'all' || e.status === filter);
+function list(cat) {
+  const all = OV.excerpts.filter(e => e.category === cat && (filter === 'all' || e.status === filter));
   $('#list').innerHTML = all.slice(0, shown).map(e => `<a class="item" href="#/r/${encodeURIComponent(e.id)}">
     <span class="st ${e.status}">${e.status === 'done' ? '✓' : ''}</span>
-    <div><div class="t">${esc(e.title)}</div><div class="meta"><span>${nice(e.category)}</span><i></i><span><span class="dot ${e.difficulty}"></span>${DIFF[e.difficulty]}</span><i></i><span>${langs(e)}</span>${e.status === 'half' ? `<i></i><span>${e.done}/${e.clips} clips</span>` : ''}</div></div>
+    <div><div class="t">${esc(e.title)}</div><div class="meta"><span>${e.done}/${e.clips} clips</span><i></i><span><span class="dot ${e.difficulty}"></span>${DIFF[e.difficulty]}</span><i></i><span>${langs(e)}</span></div></div>
     <span class="d">${fmt(e.duration)}</span></a>`).join('') || '<p class="empty">Nothing here yet.</p>';
   $('#more').innerHTML = all.length > shown ? `<button class="btn ghost small">Show more (${all.length - shown})</button>` : '';
-  if (all.length > shown) $('#more button').onclick = () => { shown += 60; list(); };
+  if (all.length > shown) $('#more button').onclick = () => { shown += 60; list(cat); };
 }
 
 /* ───── review ───── */
@@ -116,7 +151,7 @@ async function review(id, start) {
   const first = EX.clips.findIndex(c => !c.state?.verdict);
   cur = start || (first < 0 ? 0 : first);
   $('#main').innerHTML = `<section class="screen">
-  <div class="rvhead"><a class="back" href="#/"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Recordings</a>
+  <div class="rvhead"><a class="back" href="#/c/${encodeURIComponent(EX.category)}"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>${nice(EX.category)}</a>
     <h1>${esc(EX.title)}</h1>
     <div class="meta" style="margin-top:6px"><span>${nice(EX.category)}</span><i></i><span>${fmt(EX.duration)}</span><i></i><span>${EX.clips.length} clips</span><i></i><span><span class="dot ${EX.difficulty}"></span>${DIFF[EX.difficulty]}</span><i></i><span>${langs(EX)}</span>
       <button class="btn quiet helpbtn" id="helpbtn" style="margin-left:auto;padding:6px 10px">Translate</button></div></div>
@@ -214,10 +249,10 @@ async function verdict(v) {
 }
 async function finished() {
   stopAudio(); OV = await api('overview'); pill(OV); rail();
-  const n = nextUp(OV);
+  const n = nextUp(OV, EX.category) || nextUp(OV);
   $('#clipcard').innerHTML = `<div class="donebox"><span class="st done" style="width:44px;height:44px;margin:0 auto;font-size:1.1rem">✓</span>
     <h1>Recording done</h1><p class="sub">${hm(OV.hours_done)} of ${Math.round(OV.hours_total)} h reviewed.</p>
-    <div style="display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap"><a class="btn ghost" href="#/">All recordings</a>${n ? `<a class="btn primary" href="#/r/${encodeURIComponent(n.id)}">Next recording →</a>` : ''}</div></div>`;
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap"><a class="btn ghost" href="#/c/${encodeURIComponent(EX.category)}">${nice(EX.category)}</a>${n ? `<a class="btn primary" href="#/r/${encodeURIComponent(n.id)}">Next recording${n.category !== EX.category ? ` · ${nice(n.category)}` : ''} →</a>` : ''}</div></div>`;
 }
 
 /* ───── word card: 1 correct, 2 translate, 3 comment ───── */
@@ -269,17 +304,27 @@ const fold = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '
 const defHtml = (lang, d) => !d ? '' : `<span class="lg">${LN[lang]}</span>${/^don.?t know/i.test(d) ? '<span class="dk">Don’t know</span>' : esc(d)}`;
 function translator(box, use) {
   const sel = v => Object.entries(LN).map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${l}</option>`).join('');
-  box.innerHTML = `<div class="sides">
-      <div class="side"><select class="from" aria-label="From">${sel('fr')}</select><textarea class="q" rows="2" placeholder="Type a word"></textarea><div class="def sdef"></div></div>
+  box.innerHTML = `<div class="seg mode"><button data-m="tr" class="on">Translate</button><button data-m="find">Find</button></div>
+    <div class="sides">
+      <div class="side"><small class="cap">I write in</small><select class="from" aria-label="I write in">${sel('fr')}</select><textarea class="q" rows="2"></textarea><div class="def sdef"></div></div>
       <button class="swap" title="Swap languages" aria-label="Swap languages">⇄</button>
-      <div class="side out"><select class="to" aria-label="To">${sel('mfe')}</select><div class="opts"></div></div></div>
+      <div class="side out"><small class="cap">Into</small><select class="to" aria-label="Into">${sel('mfe')}</select><div class="opts"></div></div></div>
     <div class="go"><button class="btn primary small ask">Translate</button><span class="status"></span></div>`;
-  const [q, from, to, out, sdef, st, ask, swap] = ['.q', '.from', '.to', '.opts', '.sdef', '.status', '.ask', '.swap'].map(c => box.querySelector(c));
-  let local = {source_definition: '', options: []}, ai = null, timer;
+  const [q, from, to, out, sdef, st, ask, swap, capTo] = ['.q', '.from', '.to', '.opts', '.sdef', '.status', '.ask', '.swap', '.out .cap'].map(c => box.querySelector(c));
+  let local = {source_definition: '', options: []}, ai = null, timer, find = false;
+  // Find = search inside the language you write in (misspelled, as it sounds, or a meaning); Translate = into another language
+  function setMode(f) {
+    find = f; box.classList.toggle('find', f);
+    box.querySelectorAll('.mode button').forEach(b => b.classList.toggle('on', (b.dataset.m === 'find') === f));
+    capTo.textContent = f ? 'Matches' : 'Into'; ask.textContent = f ? 'Find' : 'Translate';
+    q.placeholder = f ? 'Type it as you hear it, or its meaning' : 'Type a word';
+    if (f) to.value = from.value; else if (to.value === from.value) to.value = from.value === 'mfe' ? 'fr' : 'mfe';
+    instant();
+  }
   function render() {
     const seen = new Set(), list = [...(ai?.options || []), ...local.options].filter(x => !seen.has(fold(x.text)) && seen.add(fold(x.text)));
     out.innerHTML = list.map((x, i) => `<button class="opt" data-i="${i}"><b>${esc(x.text)}</b><p class="${/^don.?t know/i.test(x.definition) ? 'dk' : ''}">${defHtml(x.lang, x.definition)}</p>${x.from === 'dictionary' ? '<span class="src">from the dictionary</span>' : ''}</button>`).join('')
-      || `<div class="empty-out">${q.value.trim() ? (ai ? 'No translation found.' : 'Press Translate.') : 'The translation appears here.'}</div>`;
+      || `<div class="empty-out">${q.value.trim() ? (ai ? 'Nothing found.' : `Press ${find ? 'Find' : 'Translate'}.`) : find ? 'Matching words appear here.' : 'The translation appears here.'}</div>`;
     out.querySelectorAll('.opt').forEach(b => b.onclick = () => { const x = list[+b.dataset.i]; use(x.text);
       if (ai?.id && x.from !== 'dictionary') api('ask/choose', {method: 'POST', body: {id: ai.id, text: x.text}}).catch(() => {}); });
     const d = ai?.source_definition || local.source_definition;
@@ -292,7 +337,7 @@ function translator(box, use) {
   }
   async function translate() {
     const v = q.value.trim(); if (!v) return q.focus();
-    st.className = 'status'; st.textContent = 'Translating…'; ask.disabled = true;
+    st.className = 'status'; st.textContent = find ? 'Searching…' : 'Translating…'; ask.disabled = true;
     try {
       const ctx = EX && $('#text') ? C().tokens.map((t, i) => shown_(t, i)).join(' ') : '';
       ai = await api('ask', {method: 'POST', body: {q: v, src: from.value, lang: to.value, context: ctx, clip_id: EX ? C().clip_id : ''}});
@@ -300,13 +345,14 @@ function translator(box, use) {
     } catch (e) { st.className = 'status err'; st.textContent = e.message; }
     ask.disabled = false; render();
   }
-  const fix = changed => { if (from.value === to.value) (changed === from ? to : from).value = Object.keys(LN).find(k => k !== from.value); instant(); };
+  const fix = changed => { if (find) to.value = from.value; else if (from.value === to.value) (changed === from ? to : from).value = Object.keys(LN).find(k => k !== from.value); instant(); };
+  box.querySelectorAll('.mode button').forEach(b => b.onclick = () => setMode(b.dataset.m === 'find'));
   from.onchange = () => fix(from); to.onchange = () => fix(to);
   swap.onclick = () => { const first = out.querySelector('.opt b')?.textContent; [from.value, to.value] = [to.value, from.value]; if (first) q.value = first; instant(); };
   q.oninput = instant;
   q.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); translate(); } if (e.key === 'Escape') closeCard(); };
   ask.onclick = translate;
-  render();
+  setMode(false);
   return {reset() { q.value = ''; local = {source_definition: '', options: []}; ai = null; st.textContent = ''; render(); }};
 }
 const cardTr = translator($('#wctr'), w => { $('#wcin').value = w; $('#wcin').focus(); toast(`“${w}” put in the correct word box`); });

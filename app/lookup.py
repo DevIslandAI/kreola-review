@@ -45,6 +45,10 @@ def translate_local(query, src, target, limit=6):
     Only pairs involving Kreol: the sheet gives every Kreol word its English and French meaning."""
     if not fold(query):
         return []
+    if src == target and target != "mfe":  # Find in French/English: the right spelling (accents too) from the word list
+        n = fold(query)
+        hits = [w for w in DICT[target] if fold(w) == n] + [w for w in DICT[target] if fold(w).startswith(n) and fold(w) != n]
+        return [{"text": w, "lang": target, "definition": "", "from": "dictionary"} for w in hits[:limit]]
     if target == "mfe":
         return [{"text": e["w"], "lang": "mfe", "definition": e["en"] or "Don't know", "from": "dictionary"}
                 for e in kreol_hits(query, limit)]
@@ -57,9 +61,11 @@ def translate_local(query, src, target, limit=6):
     return []  # French <-> English: Claude only
 
 
-SYSTEM = f"""You are a translator for a reviewer correcting transcripts of Mauritian speech (Kreol Morisien, French,
-English, often mixed). The reviewer gives a word or phrase in one language and wants it in another language.
-- Give up to 4 translations in the wanted language, most likely first.
+SYSTEM = f"""You are a translator and dictionary for a reviewer correcting transcripts of Mauritian speech (Kreol Morisien,
+French, English, often mixed). The reviewer says which language they are writing in.
+- Translate: they want the word in another language. Give up to 4 translations in the wanted language, most likely first.
+- Find: the wanted language is the one they write in. Their input may be misspelled, written as it sounds, or describe
+  the meaning. Give up to 4 real words of that language that they probably mean, correctly spelled, most likely first.
 - Under each, a definition: one short line in English saying what the word means.
 - Also define the input itself in source_definition.
 - If you are not sure what a word means, the definition is exactly: Don't know. Never guess a meaning.
@@ -89,7 +95,8 @@ def ask(query, src, target, context="", clip_id=""):
         raise BudgetReached(f"Claude budget of ${CLAUDE_MAX_USD:.2f} reached")
     seen = kreol_hits(query, 6) + [e for t in words(query) for e in kreol_hits(t, 3)]
     known = "\n".join(f"- {e['w']} ({e['kind']}): {e['en']} / {e['fr']}" for e in {e["w"]: e for e in seen}.values())
-    prompt = (f"Translate from {LANGS[src]} to {LANGS[target]}.\nInput: {query}\n"
+    task = f"Find the {LANGS[src]} word." if src == target else f"Translate from {LANGS[src]} to {LANGS[target]}."
+    prompt = (f"{task}\nInput (written in {LANGS[src]}): {query}\n"
               + (f"Sentence it comes from: {context}\n" if context else "")
               + (f"Matching entries from our Kreol vocabulary sheet:\n{known}\n" if known else ""))
     client = anthropic.Anthropic(api_key=env("ANTHROPIC_API_KEY"))

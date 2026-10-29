@@ -94,8 +94,10 @@ h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--in
 .stack i{display:block;height:100%;border-radius:6px;position:relative;cursor:default;transition:transform .15s,filter .15s}
 .stack i:first-child{border-radius:999px 6px 6px 999px}.stack i:last-child{border-radius:6px 999px 999px 6px}
 .stack i:hover,.stack i.on{transform:scaleY(1.25);filter:brightness(.95)}
-.tip{position:absolute;bottom:calc(100% + 12px);left:50%;transform:translateX(-50%);background:rgba(31,36,33,.92);color:#fff;font-size:.78rem;font-style:normal;padding:7px 11px;border-radius:10px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:5}
-.stack i:hover .tip,.stack i.on .tip{opacity:1}
+.tip{position:absolute;bottom:calc(100% + 12px);left:50%;transform:translateX(-50%);background:rgba(31,36,33,.92);color:#fff;font-size:.78rem;font-style:normal;padding:7px 11px;border-radius:10px;white-space:nowrap;pointer-events:none;z-index:5;display:none}
+.stack i:hover .tip,.stack i.on .tip{display:block}
+.stack i:first-child .tip{left:0;transform:none}
+.stack i:nth-last-child(-n+2) .tip{left:auto;right:0;transform:none}
 .legend{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:.86rem}
 .legend span{display:inline-flex;align-items:center;gap:8px;color:var(--ink2)}
 .legend b{font-weight:500;color:var(--ink)}
@@ -104,6 +106,19 @@ h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--in
 .bar i{display:block;height:100%;background:var(--sage);border-radius:999px;transition:width .4s}
 .rowbar{display:grid;grid-template-columns:130px 1fr 80px;gap:14px;align-items:center;font-size:.86rem;margin-bottom:12px}
 .rowbar .n{color:var(--ink2);text-align:right;font-variant-numeric:tabular-nums;font-size:.8rem}
+.fam+.fam{margin-top:22px}
+.fam h3{font-size:.86rem;font-weight:500;color:var(--ink2);margin-bottom:10px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.tile{display:flex;flex-direction:column;gap:6px;padding:16px;border-radius:16px;background:var(--ivory);box-shadow:var(--inset);text-decoration:none;color:inherit;transition:transform .12s ease-out,box-shadow .2s,background .2s}
+.tile:hover{background:#fff;box-shadow:var(--shadow)}
+.tile:active{transform:scale(.98)}
+.tile b{font-weight:500;font-size:.98rem}
+.tile .tm{font-size:.78rem;color:var(--ink3)}
+.tile .bar{margin-top:6px;height:6px}
+.tile .tp{font-size:.76rem;color:var(--ink2)}
+.tile.done .tp{color:var(--sage-d);font-weight:500}
+.catbar{display:flex;align-items:center;gap:20px;padding:18px 24px}
+.tag{font-size:.84rem;color:var(--sage-d);font-weight:500}
 .list{margin-top:12px}
 .item{display:grid;grid-template-columns:26px 1fr auto;gap:16px;align-items:center;padding:14px 10px;border-radius:14px;transition:background .15s;cursor:pointer;text-decoration:none;color:inherit}
 .item:hover{background:rgba(255,255,255,.7)}
@@ -198,6 +213,11 @@ h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--in
 .opt p{font-size:.76rem;color:var(--ink2);margin-top:2px;line-height:1.35}
 .opt .src{font-size:.62rem;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em}
 .tr .go{display:flex;align-items:center;gap:10px;margin-top:10px}
+.tr .mode{margin-bottom:10px}
+.tr .mode button{padding:5px 12px;font-size:.8rem}
+.tr .cap{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);padding:2px 2px 0}
+.tr.find .to,.tr.find .swap{visibility:hidden}
+.tr.find .to{height:0;padding:0}
 .status{font-size:.78rem;color:var(--ink3)}
 .status.err{color:var(--clay)}
 .empty-out{font-size:.8rem;color:var(--ink3);padding:4px 2px}
@@ -257,6 +277,9 @@ td.n{text-align:right;color:var(--ink2);font-variant-numeric:tabular-nums}
   .next .btn{width:100%}
   .stats{gap:22px}
   .rowbar{grid-template-columns:96px 1fr 66px;gap:10px}
+  .tiles{grid-template-columns:1fr 1fr;gap:10px}
+  .tile{padding:14px}
+  .catbar{flex-direction:column;align-items:stretch;gap:14px;padding:18px}
   .flow{grid-template-columns:1fr}.flow .arr{transform:rotate(90deg);justify-self:center}
   .text{font-size:1.18rem;line-height:2.2}
   .player{gap:12px}.play{width:48px;height:48px}
