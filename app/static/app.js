@@ -28,6 +28,7 @@ async function route() {
   const h = location.hash.replace(/^#\/?/, '').split('/');
   $$('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === ({r: 'review', review: 'review'}[h[0]] || 'overview')));
   if (h[0] !== 'c') filter = 'all';
+  document.body.classList.toggle('in-review', h[0] === 'r');
   try {
     if (h[0] === 'c' && h[1]) return category(decodeURIComponent(h[1]));
     if (h[0] === 'r' && h[1]) return review(decodeURIComponent(h[1]), +h[2] || 0);
@@ -162,6 +163,7 @@ const audio = new Audio(); audio.preload = 'auto';
 let EX = null, cur = 0, stopAt = null, heardJ = null, clipT0 = Date.now(), lastTap = {};
 function stopAudio() { audio.pause(); stopAt = null; heardJ = null; }
 const C = () => EX.clips[cur];
+const autoplay = () => { try { return localStorage.getItem('kreola.autoplay') !== '0'; } catch (e) { return true; } };  // on by default
 const S = () => C().state || (C().state = {edits: {}, why: [], note: '', verdict: null});
 const shown_ = (t, i) => { const e = S().edits[i] || {}; return e.show ?? t.auto ?? t.t; };
 const wordVoice = i => C().voice.filter(v => v.word === i);
@@ -182,6 +184,7 @@ async function review(id, start) {
     <span class="grow"></span>
     <div class="rvnav"><button class="nb" id="prevc" aria-label="Previous clip" title="Previous clip (←)">‹</button><span id="clipno"></span><button class="nb" id="nextc" aria-label="Next clip" title="Next clip (→)">›</button></div>
     <button class="btn quiet helpbtn" id="helpbtn" title="Translate / find a word"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h8M8 3v2M6 5c0 4 2 7 6 9M10 5c0 3-2 6-6 8"/><path d="m13 21 4-9 4 9M14.5 18h5"/></svg><span class="tw">Translate</span></button>
+    <button class="btn quiet autop" id="autop" title="Play the next clip automatically after saving"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg><span class="tw">Auto-play</span></button>
     <button class="btn quiet" id="skip">Skip</button>
     <button class="btn primary" id="ok">✓ <span id="okl">Clip is correct</span></button>
   </div>
@@ -191,10 +194,22 @@ async function review(id, start) {
     <aside class="card help" id="help"><div style="display:flex;align-items:center"><h2 style="margin:0">Translate</h2><button class="btn quiet helpbtn" id="helpx" style="margin-left:auto;padding:4px 10px">Close</button></div>
       <div class="tr" id="htr" style="margin-top:14px"></div>
       <p class="hint" style="margin-top:14px">Tap a result to copy it. To change a word in the text, double-click the word.</p></aside>
+  </div>
+  <div class="actbar" id="actbar">
+    <div class="arow"><button class="ab nb2" id="aprev" aria-label="Previous clip">‹</button>
+      <button class="ab aplay" id="aplay"><svg id="api" width="18" height="18" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg><span>Play clip</span></button>
+      <button class="ab nb2" id="anext" aria-label="Next clip">›</button></div>
+    <div class="arow"><button class="ab quiet" id="askip">Skip</button>
+      <button class="ab talk" id="holdmic" aria-label="Hold to record a voice note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span class="lbl">Hold to talk</span></button>
+      <button class="ab save" id="aok">✓ <span id="aokl">Correct</span></button></div>
   </div></section>`;
   translator($('#htr'), w => { navigator.clipboard?.writeText(w); toast(`Copied “${w}”`); });
   $('#helpbtn').onclick = () => $('#help').classList.add('on'); $('#helpx').onclick = () => $('#help').classList.remove('on');
-  $('#ok').onclick = () => verdict(); $('#skip').onclick = () => verdict('skip');
+  $('#ok').onclick = $('#aok').onclick = () => verdict(); $('#skip').onclick = $('#askip').onclick = () => verdict('skip');
+  $('#aprev').onclick = () => $('#prevc').click(); $('#anext').onclick = () => $('#nextc').click(); $('#aplay').onclick = () => $('#play').click();
+  $('#autop').classList.toggle('on', autoplay());
+  $('#autop').onclick = () => { const on = !autoplay(); try { localStorage.setItem('kreola.autoplay', on ? '1' : '0'); } catch (e) {} $('#autop').classList.toggle('on', on); toast(on ? 'Auto-play on: the next clip plays after you save' : 'Auto-play off'); };
+  holdToTalk($('#holdmic'));
   $('#prevc').onclick = () => cur > 0 && load(cur - 1); $('#nextc').onclick = () => cur < EX.clips.length - 1 && load(cur + 1);
   load(cur);
 }
@@ -232,8 +247,8 @@ function load(i) {
   $('#clipnote').oninput = e => { S().note = e.target.value; clearTimeout(load.t); load.t = setTimeout(save, 700); };
   $('#clipmic').onclick = () => record($('#clipmic'), null, () => voiceList($('#clipvoice'), C().voice.filter(v => v.word == null)));
   voiceList($('#clipvoice'), C().voice.filter(v => v.word == null));
-  $('#clipno').innerHTML = `<span class="cw">Clip ${cur + 1} of ${EX.clips.length}</span><span class="cs">${cur + 1}/${EX.clips.length}</span>`; $('#prevc').disabled = cur === 0; $('#nextc').disabled = cur === EX.clips.length - 1;
-  $('#ok').hidden = $('#skip').hidden = false;
+  $('#clipno').innerHTML = `<span class="cw">Clip ${cur + 1} of ${EX.clips.length}</span><span class="cs">${cur + 1}/${EX.clips.length}</span>`; $('#prevc').disabled = cur === 0; $('#nextc').disabled = cur === EX.clips.length - 1; $('#aprev').disabled = cur === 0; $('#anext').disabled = cur === EX.clips.length - 1;
+  $('#ok').hidden = $('#skip').hidden = $('#actbar').hidden = false;
   history.replaceState(null, '', `#/r/${encodeURIComponent(EX.id)}/${cur}`);
   audio.currentTime = C().offset;
   rail(); text();
@@ -243,10 +258,19 @@ function text() {
   $('#text').innerHTML = toks.map((t, i) => { const e = S().edits[i] || {};
     const cls = e.gone ? 'gone' : mine(t, i) ? 'mine' : '';
     return `<span class="w ${cls}${flagged(i) ? ' flagged' : ''}" data-j="${i}">${esc(shown_(t, i))}</span>`; }).join(' ');
-  $$('#text .w').forEach(el => el.onclick = () => { const j = +el.dataset.j, now = Date.now();  // one tap: hear it; second tap: open its card
-    if (lastTap.j === j && now - lastTap.t < 350) { lastTap = {}; openCard(j); } else { lastTap = {j, t: now}; hear(j); } });
+  $$('#text .w').forEach(el => {
+    let lp = null, fired = false, x0 = 0, y0 = 0;
+    el.onpointerdown = e => { fired = false; x0 = e.clientX; y0 = e.clientY; if (e.pointerType !== 'mouse') lp = setTimeout(() => { fired = true; navigator.vibrate?.(8); openCard(+el.dataset.j); }, 450); };
+    el.onpointermove = e => { if (lp && Math.hypot(e.clientX - x0, e.clientY - y0) > 10) { clearTimeout(lp); lp = null; } };
+    el.onpointerup = el.onpointercancel = () => { clearTimeout(lp); lp = null; };
+    el.onclick = () => { const j = +el.dataset.j, now = Date.now();  // one tap: hear it; second tap (or a long press): open its card
+      if (fired) { fired = false; return; }
+      if (lastTap.j === j && now - lastTap.t < 350) { lastTap = {}; openCard(j); } else { lastTap = {j, t: now}; hear(j); } };
+  });
+  $('#text').oncontextmenu = e => e.preventDefault();
   const ch = toks.some((t, i) => mine(t, i));  // short labels on a phone so the header fits one row
   $('#okl').textContent = phone() ? (ch ? 'Save' : 'Correct') : (ch ? 'Save & next clip' : 'Clip is correct');
+  $('#aokl').textContent = ch ? 'Save' : 'Correct';
   $('#ticks').innerHTML = toks.map((t, i) => `<i class="${flagged(i) || mine(t, i) ? 'flag' : ''}" style="left:${t.s / C().dur * 100}%;height:${8 + ((t.t.length * 7) % 18)}px"></i>`).join('');
   $('#before').innerHTML = toks.map((t, i) => mine(t, i) || t.auto ? `<span class="was">${esc(t.t)}</span>` : esc(t.t)).join(' ');
   const notes = [];
@@ -258,9 +282,10 @@ function text() {
 
 /* audio: a clip plays between its own start and end; a tapped word plays alone */
 function playClip() { const c = C(); if (audio.currentTime < c.offset || audio.currentTime >= c.offset + c.dur - .05) audio.currentTime = c.offset; heardJ = null; stopAt = c.offset + c.dur; audio.play().catch(() => {}); }
+function playFrom(j) { const c = C(), t = c.tokens[j]; audio.currentTime = c.offset + Math.max(0, t.s - .06); heardJ = null; stopAt = c.offset + c.dur; audio.play().catch(() => {}); }
 function hear(j) { const t = C().tokens[j]; audio.currentTime = C().offset + Math.max(0, t.s - .06); stopAt = C().offset + t.e + .12; heardJ = j; audio.play().catch(() => {}); }
 const PLAY = '<path d="M6 3.5v13l11-6.5z" fill="currentColor"/>', PAUSE = '<rect x="5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/>';
-audio.onplay = () => $('#pi') && ($('#pi').innerHTML = PAUSE); audio.onpause = () => $('#pi') && ($('#pi').innerHTML = PLAY);
+audio.onplay = () => ['#pi', '#api'].forEach(k => $(k) && ($(k).innerHTML = PAUSE)); audio.onpause = () => ['#pi', '#api'].forEach(k => $(k) && ($(k).innerHTML = PLAY));
 // backup for the frame loop below, which browsers slow down in background tabs
 audio.ontimeupdate = () => { if (stopAt !== null && audio.currentTime >= stopAt) { audio.pause(); stopAt = null; heardJ = null; } };
 (function tick() {
@@ -283,11 +308,13 @@ async function save(v) {
 async function verdict(v) {
   const s = S(); v = v || (C().tokens.some((t, i) => mine(t, i)) ? 'fixed' : 'ok');
   await save(v); toast({ok: 'Marked correct', fixed: 'Fixes saved', skip: 'Skipped for now'}[v] + ` · clip ${cur + 1}`);
+  navigator.vibrate?.(12);
   OV = null; load(cur + 1);
+  if (autoplay() && cur < EX.clips.length) playClip();
 }
 async function finished() {
   stopAudio(); OV = await api('overview'); pill(OV); rail();
-  $('#ok').hidden = $('#skip').hidden = true; $('#clipno').textContent = 'Done'; $('#nextc').disabled = true; $('#prevc').disabled = false;
+  $('#ok').hidden = $('#skip').hidden = $('#actbar').hidden = true; $('#clipno').textContent = 'Done'; $('#nextc').disabled = true; $('#prevc').disabled = false;
   const n = nextUp(OV, EX.category) || nextUp(OV);
   $('#clipcard').innerHTML = `<div class="donebox"><span class="st done" style="width:44px;height:44px;margin:0 auto;font-size:1.1rem">✓</span>
     <h1>Recording done</h1><p class="sub">${hm(OV.hours_done)} of ${Math.round(OV.hours_total)} h reviewed.</p>
@@ -303,6 +330,7 @@ function openCard(j) {
   $('#wcword').textContent = t.t; $('#wcwhen').textContent = `myt wrote this · at ${fmt(C().offset + t.s)}`;
   $('#wcin').value = shown_(t, j); $('#wcnote').value = e.note || '';
   cardTr.reset();
+  trOpen(trOpen());
   $('#wcchips').innerHTML = WORD_WHY.map(w => `<button class="chip ${draft.why.includes(w) ? 'on' : ''}">${w}</button>`).join('');
   $$('#wcchips .chip').forEach(b => b.onclick = () => { const k = draft.why.indexOf(b.textContent); k < 0 ? draft.why.push(b.textContent) : draft.why.splice(k, 1); b.classList.toggle('on'); });
   $('#wcrm').textContent = draft.gone ? 'Put this word back' : 'Remove this word (not said)';
@@ -334,6 +362,7 @@ function saveCard() {
 $('#wcin').onkeydown = $('#wcnote').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); saveCard(); } if (e.key === 'Escape') closeCard(); };
 $('#wcsave').onclick = saveCard; $('#wccancel').onclick = $('#wcx').onclick = $('#scrim').onclick = closeCard;
 $('#wchear').onclick = () => hear(cj);
+$('#wcfrom').onclick = () => { const j = cj; closeCard(); playFrom(j); };
 $('#wcrm').onclick = () => { draft.gone = !draft.gone; if (draft.gone) saveCard(); else $('#wcrm').textContent = 'Remove this word (not said)'; };
 addEventListener('keydown', e => { if (e.key === 'Escape') { closeCard(); $('#help')?.classList.remove('on'); } });
 /* moving around without reaching for buttons: laptop ← → change clip, Space plays; phone: swipe the clip left / right */
@@ -377,7 +406,7 @@ function translator(box, use) {
   }
   function render() {
     const seen = new Set(), list = [...(ai?.options || []), ...local.options].filter(x => !seen.has(fold(x.text)) && seen.add(fold(x.text)));
-    out.innerHTML = list.map((x, i) => `<button class="opt" data-i="${i}"><b>${esc(x.text)}</b><p class="${/^don.?t know/i.test(x.definition) ? 'dk' : ''}">${defHtml(x.lang, x.definition)}</p>${x.from === 'dictionary' ? '<span class="src">from the dictionary</span>' : ''}</button>`).join('')
+    out.innerHTML = list.map((x, i) => `<button class="opt" data-i="${i}"><b>${esc(x.text)}</b><p class="${/^don.?t know/i.test(x.definition) ? 'dk' : ''}">${defHtml(x.lang, x.definition)}</p><span class="src ${x.from === 'dictionary' ? 'dict' : 'ai'}">${x.from === 'dictionary' ? 'Dictionary' : 'Suggested by Claude'}</span></button>`).join('')
       || `<div class="empty-out">${q.value.trim() ? (ai ? 'Nothing found.' : `Press ${find ? 'Find' : 'Translate'}.`) : find ? 'Matching words appear here.' : 'The translation appears here.'}</div>`;
     out.querySelectorAll('.opt').forEach(b => b.onclick = () => { const x = list[+b.dataset.i]; use(x.text);
       if (ai?.id && x.from !== 'dictionary') api('ask/choose', {method: 'POST', body: {id: ai.id, text: x.text}}).catch(() => {}); });
@@ -409,35 +438,49 @@ function translator(box, use) {
   setMode(false);
   return {reset() { q.value = ''; local = {source_definition: '', options: []}; ai = null; st.textContent = ''; render(); }};
 }
+function trOpen(v) {  // the Translate part of the word card is folded unless you open it (remembered)
+  if (v === undefined) { try { return localStorage.getItem('kreola.tropen') === '1'; } catch (e) { return false; } }
+  $('#wctr').hidden = !v; $('#wctrhead').classList.toggle('open', v); try { localStorage.setItem('kreola.tropen', v ? '1' : '0'); } catch (e) {}
+}
+$('#wctrhead').onclick = () => trOpen($('#wctr').hidden);
 const cardTr = translator($('#wctr'), w => { $('#wcin').value = w; $('#wcin').focus(); toast(`“${w}” put in the correct word box`); });
 
 /* voice notes: recorded in the browser, stored and transcribed on the server (myt, English/French) */
 let rec = null;
+/* hold to talk (phone bottom bar): press = record a note on the clip, release = save it */
+let holdDown = false;
+function holdToTalk(btn) {
+  btn.oncontextmenu = e => e.preventDefault();
+  btn.onpointerdown = e => { e.preventDefault(); holdDown = true; if (rec?.state !== 'recording' && !btn.classList.contains('busy')) record(btn, null, () => voiceList($('#clipvoice'), C().voice.filter(v => v.word == null)), true); };
+  btn.onpointerup = btn.onpointercancel = btn.onpointerleave = () => { if (!holdDown) return; holdDown = false; if (rec?.state === 'recording') rec.stop(); };
+}
 /* the mic shows what is happening: recording (red, live timer) -> saving and transcribing (spinner) -> the finished note */
 const SPIN = '<span class="spin" aria-hidden="true"></span>';
-async function record(btn, word, after) {
+async function record(btn, word, after, hold = false) {
   if (rec?.state === 'recording') { rec.stop(); return; }
   if (btn.classList.contains('busy')) return;
   let st;
   try { st = await navigator.mediaDevices.getUserMedia({audio: true}); }
   catch (e) { toast('Microphone not available: allow it in the browser'); return; }
+  const lbl = btn.querySelector('.lbl'), lblText = lbl?.textContent;
   const chunks = [], clip = C(), icon = btn.innerHTML, list = $(btn.id === 'wcmic' ? '#wcvoice' : '#clipvoice'), t0 = Date.now();
   list.insertAdjacentHTML('beforeend', '<div class="vpending rec"><span class="rdot"></span><span class="vmsg">Recording 0:00</span><span class="vhint">tap the mic to stop</span></div>');
   const pend = list.lastElementChild, msg = pend.querySelector('.vmsg');
-  const timer = setInterval(() => msg.textContent = `Recording ${fmt((Date.now() - t0) / 1000)}`, 250);
+  const timer = setInterval(() => { msg.textContent = `Recording ${fmt((Date.now() - t0) / 1000)}`; if (lbl) lbl.textContent = `Recording ${fmt((Date.now() - t0) / 1000)}`; }, 250);
   rec = new MediaRecorder(st);
   rec.ondataavailable = e => chunks.push(e.data);
   rec.onstop = async () => {
     clearInterval(timer); st.getTracks().forEach(t => t.stop());
-    btn.classList.remove('rec'); btn.classList.add('busy'); btn.innerHTML = SPIN;
+    btn.classList.remove('rec'); btn.classList.add('busy'); if (lbl) lbl.textContent = 'Saving…'; else btn.innerHTML = SPIN;
     pend.className = 'vpending busy'; pend.innerHTML = `${SPIN}<span class="vmsg">Saving and transcribing…</span><span class="vhint">${fmt((Date.now() - t0) / 1000)}</span>`;
     const fd = new FormData(); fd.append('file', new Blob(chunks, {type: rec.mimeType || 'audio/webm'}), 'note.webm'); fd.append('clip_id', clip.clip_id);
     if (word != null) fd.append('word', word);
     try { const v = await api('voice', {method: 'POST', body: fd}); clip.voice.push(v); toast(v.transcript ? 'Voice note saved and transcribed' : 'Voice note saved'); after(); if (EX && C() === clip && !$('#wc').classList.contains('on')) text(); }
     catch (e) { pend.remove(); toast('Voice note not saved: ' + e.message); }
-    btn.classList.remove('busy'); btn.innerHTML = icon;
+    btn.classList.remove('busy'); if (lbl) lbl.textContent = lblText; else btn.innerHTML = icon;
   };
   rec.start(); btn.classList.add('rec');
+  if (hold && !holdDown) rec.stop();  // released before the microphone was ready
 }
 const vAudio = new Audio(); let vBtn = null;
 const PLAYI = '<svg width="14" height="14" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg>', PAUSEI = '<svg width="14" height="14" viewBox="0 0 20 20"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/></svg>';

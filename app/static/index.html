@@ -29,6 +29,7 @@
   <div class="top2">
     <button class="hearbtn" id="wchear" aria-label="Hear this word"><svg width="14" height="14" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg></button>
     <div><b id="wcword"></b><br><small id="wcwhen"></small></div>
+    <button class="frombtn" id="wcfrom" title="Play the clip from this word">▶ Play from here</button>
     <button class="x" id="wcx" aria-label="Close">✕</button>
   </div>
 
@@ -38,8 +39,8 @@
   </div>
 
   <div class="part">
-    <label for="wcq">2 · Translate a word</label>
-    <div class="tr" id="wctr"></div>
+    <button class="parthead" id="wctrhead" type="button">2 · Translate or find a word <span class="chev">›</span></button>
+    <div class="tr" id="wctr" hidden></div>
   </div>
 
   <div class="part">
