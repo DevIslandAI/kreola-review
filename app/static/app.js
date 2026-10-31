@@ -184,7 +184,8 @@ async function review(id, start) {
     <span class="grow"></span>
     <div class="rvnav"><button class="nb" id="prevc" aria-label="Previous clip" title="Previous clip (←)">‹</button><span id="clipno"></span><button class="nb" id="nextc" aria-label="Next clip" title="Next clip (→)">›</button></div>
     <button class="btn quiet helpbtn" id="helpbtn" title="Translate / find a word"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h8M8 3v2M6 5c0 4 2 7 6 9M10 5c0 3-2 6-6 8"/><path d="m13 21 4-9 4 9M14.5 18h5"/></svg><span class="tw">Translate</span></button>
-    <button class="btn quiet autop" id="autop" title="Play the next clip automatically after saving"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg><span class="tw">Auto-play</span></button>
+    <button class="btn quiet autop" id="autop" role="switch" title="Play the next clip automatically after saving"><span class="aplbl">Auto-play</span><span class="sw" aria-hidden="true"><i></i></span></button>
+    <button class="btn ghost approveall2" id="approveall2" hidden></button>
     <button class="btn quiet" id="skip">Skip</button>
     <button class="btn primary" id="ok">✓ <span id="okl">Clip is correct</span></button>
   </div>
@@ -196,20 +197,22 @@ async function review(id, start) {
       <p class="hint" style="margin-top:14px">Tap a result to copy it. To change a word in the text, double-click the word.</p></aside>
   </div>
   <div class="actbar" id="actbar">
+    <button class="approveall" id="approveall" hidden></button>
     <div class="arow"><button class="ab nb2" id="aprev" aria-label="Previous clip">‹</button>
-      <button class="ab aplay" id="aplay"><svg id="api" width="18" height="18" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg><span>Play clip</span></button>
+      <button class="ab save" id="aok">✓ <span id="aokl">Correct</span></button>
       <button class="ab nb2" id="anext" aria-label="Next clip">›</button></div>
     <div class="arow"><button class="ab quiet" id="askip">Skip</button>
       <button class="ab talk" id="holdmic" aria-label="Hold to record a voice note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span class="lbl">Hold to talk</span></button>
-      <button class="ab save" id="aok">✓ <span id="aokl">Correct</span></button></div>
+      <button class="ab aplay" id="aplay"><svg id="api" width="16" height="16" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg><span>Play</span></button></div>
   </div></section>`;
   translator($('#htr'), w => { navigator.clipboard?.writeText(w); toast(`Copied “${w}”`); });
   $('#helpbtn').onclick = () => $('#help').classList.add('on'); $('#helpx').onclick = () => $('#help').classList.remove('on');
   $('#ok').onclick = $('#aok').onclick = () => verdict(); $('#skip').onclick = $('#askip').onclick = () => verdict('skip');
   $('#aprev').onclick = () => $('#prevc').click(); $('#anext').onclick = () => $('#nextc').click(); $('#aplay').onclick = () => $('#play').click();
-  $('#autop').classList.toggle('on', autoplay());
-  $('#autop').onclick = () => { const on = !autoplay(); try { localStorage.setItem('kreola.autoplay', on ? '1' : '0'); } catch (e) {} $('#autop').classList.toggle('on', on); toast(on ? 'Auto-play on: the next clip plays after you save' : 'Auto-play off'); };
+  $('#autop').classList.toggle('on', autoplay()); $('#autop').setAttribute('aria-checked', autoplay());
+  $('#autop').onclick = () => { const on = !autoplay(); try { localStorage.setItem('kreola.autoplay', on ? '1' : '0'); } catch (e) {} $('#autop').classList.toggle('on', on); $('#autop').setAttribute('aria-checked', on); toast(on ? 'Auto-play on: after you save, the next clip plays by itself' : 'Auto-play off: press Play for each clip'); };
   holdToTalk($('#holdmic'));
+  seen = new Set(); $('#approveall').onclick = $('#approveall2').onclick = approveAll;
   $('#prevc').onclick = () => cur > 0 && load(cur - 1); $('#nextc').onclick = () => cur < EX.clips.length - 1 && load(cur + 1);
   load(cur);
 }
@@ -221,6 +224,7 @@ function rail() {
 }
 function load(i) {
   closeCard(); stopAudio(); flushTime(); cur = i;
+  if (i < EX.clips.length) seen.add(i);
   if (i >= EX.clips.length) return finished();
   $('#clipcard').innerHTML = `
     <div class="extitle" title="${esc(EX.title)}"><span class="et">${esc(EX.title)}</span>
@@ -229,9 +233,7 @@ function load(i) {
       <div class="track"><div class="scrub" id="scrub"><div id="ticks"></div><div class="hl" id="hl"></div></div><div class="times"><span id="tcur">0:00</span><span>${fmt(C().dur)}</span></div></div>
       <div class="speed" id="speed"><button data-r=".75">0.75×</button><button data-r="1" class="on">1×</button></div></div>
     <div class="text" id="text"></div>
-    <div class="howto"><span class="hp"><svg width="14" height="14" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg>${TAP} a word to hear it</span>
-      <span class="hp"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>${TAP2} to fix, translate or comment</span>
-      <span class="legend3"><span><u></u>Your change</span><span><span class="dot" style="background:var(--flag)"></span>Your comment</span></span></div>
+    <div class="howto"><span class="legend3"><span><u></u>Your change</span></span></div>
     <div class="sect"><h3>Comment on the whole clip</h3><div class="chips" id="clipchips"></div>
       <div class="field" style="margin-top:12px"><input id="clipnote" placeholder="Anything about this clip"><button class="mic" id="clipmic" title="Record a voice note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button></div>
       <div id="clipvoice"></div></div>
@@ -250,6 +252,7 @@ function load(i) {
   $('#clipno').innerHTML = `<span class="cw">Clip ${cur + 1} of ${EX.clips.length}</span><span class="cs">${cur + 1}/${EX.clips.length}</span>`; $('#prevc').disabled = cur === 0; $('#nextc').disabled = cur === EX.clips.length - 1; $('#aprev').disabled = cur === 0; $('#anext').disabled = cur === EX.clips.length - 1;
   $('#ok').hidden = $('#skip').hidden = $('#actbar').hidden = false;
   history.replaceState(null, '', `#/r/${encodeURIComponent(EX.id)}/${cur}`);
+  showApproveAll();
   audio.currentTime = C().offset;
   rail(); text();
 }
@@ -307,14 +310,42 @@ async function save(v) {
 }
 async function verdict(v) {
   const s = S(); v = v || (C().tokens.some((t, i) => mine(t, i)) ? 'fixed' : 'ok');
-  await save(v); toast({ok: 'Marked correct', fixed: 'Fixes saved', skip: 'Skipped for now'}[v] + ` · clip ${cur + 1}`);
+  await save(v);
+  const said = {ok: 'Marked correct', fixed: 'Fixes saved', skip: 'Skipped for now'}[v] + ` · clip ${cur + 1}`;
   navigator.vibrate?.(12);
   OV = null; load(cur + 1);
-  if (autoplay() && cur < EX.clips.length) playClip();
+  if (autoplay() && cur < EX.clips.length) { playClip(); toast(`${said} · now playing clip ${cur + 1}`); } else toast(said);
+}
+/* approve all: after every clip of the recording has been opened (swiped or arrowed through), one button marks the
+   clips not yet judged: "Fixed" where you changed words, "Correct" elsewhere; skipped clips stay skipped. Tap twice. */
+let seen = new Set(), armed = null;
+const pendingClips = () => EX.clips.filter(c => !c.state?.verdict);
+const editedClip = c => Object.values(c.state?.edits || {}).some(e => e.gone || e.show != null);
+function showApproveAll() {
+  const n = pendingClips().length, on = seen.size === EX.clips.length && n > 0;
+  ['#approveall', '#approveall2'].forEach(k => { $(k).hidden = !on; $(k).classList.remove('armed'); $(k).textContent = `✓ Approve all ${n} clip${n > 1 ? 's' : ''}`; });
+  clearTimeout(armed); armed = null;
+}
+async function approveAll() {
+  const todo = pendingClips();
+  if (!armed) {  // first tap arms it for 3 seconds
+    ['#approveall', '#approveall2'].forEach(k => { $(k).classList.add('armed'); $(k).textContent = `Tap again to approve ${todo.length}`; });
+    armed = setTimeout(showApproveAll, 3000); return;
+  }
+  clearTimeout(armed); armed = null;
+  try {
+    for (const c of todo) {
+      const st = c.state || (c.state = {edits: {}, why: [], note: ''}), v = editedClip(c) ? 'fixed' : 'ok';
+      await api('clip/' + c.clip_id, {method: 'PUT', body: {verdict: v, edits: st.edits || {}, why: st.why || [], note: st.note || '', seconds: 0}});
+      st.verdict = v;
+    }
+    navigator.vibrate?.(20); toast(`${todo.length} clip${todo.length > 1 ? 's' : ''} approved`);
+    OV = null; load(EX.clips.length);
+  } catch (e) { if (e.message !== 'login') toast('Not saved: ' + e.message); showApproveAll(); }
 }
 async function finished() {
   stopAudio(); OV = await api('overview'); pill(OV); rail();
-  $('#ok').hidden = $('#skip').hidden = $('#actbar').hidden = true; $('#clipno').textContent = 'Done'; $('#nextc').disabled = true; $('#prevc').disabled = false;
+  $('#ok').hidden = $('#skip').hidden = $('#actbar').hidden = $('#approveall2').hidden = true; $('#clipno').textContent = 'Done'; $('#nextc').disabled = true; $('#prevc').disabled = false;
   const n = nextUp(OV, EX.category) || nextUp(OV);
   $('#clipcard').innerHTML = `<div class="donebox"><span class="st done" style="width:44px;height:44px;margin:0 auto;font-size:1.1rem">✓</span>
     <h1>Recording done</h1><p class="sub">${hm(OV.hours_done)} of ${Math.round(OV.hours_total)} h reviewed.</p>
