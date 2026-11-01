@@ -172,6 +172,7 @@ const touched = c => c.state && (Object.keys(c.state.edits || {}).length || (c.s
 const mine = (t, i) => { const e = S().edits[i] || {}; return e.gone || (e.show != null && e.show !== (t.auto ?? t.t)); };
 
 async function review(id, start) {
+  EX = null; cur = 0;
   if (!OV) OV = await api('overview');
   pill(OV);
   EX = await api('excerpt/' + encodeURIComponent(id));
@@ -292,12 +293,13 @@ audio.onplay = () => ['#pi', '#api'].forEach(k => $(k) && ($(k).innerHTML = PAUS
 // backup for the frame loop below, which browsers slow down in background tabs
 audio.ontimeupdate = () => { if (stopAt !== null && audio.currentTime >= stopAt) { audio.pause(); stopAt = null; heardJ = null; } };
 (function tick() {
-  if (EX && $('#text')) {
-    const c = C(), t = audio.currentTime - c.offset, live = !audio.paused;
+  const c = EX && $('#text') ? C() : null;
+  if (c) try {
+    const t = audio.currentTime - c.offset, live = !audio.paused;
     if (stopAt !== null && audio.currentTime >= stopAt) { audio.pause(); stopAt = null; heardJ = null; }
     $('#hl').style.left = Math.max(0, Math.min(100, t / c.dur * 100)) + '%'; $('#tcur').textContent = fmt(Math.max(0, t));
-    $$('#text .w').forEach((el, j) => el.classList.toggle('now', live && (heardJ !== null ? j === heardJ : t >= c.tokens[j].s && t < c.tokens[j].e + .04)));
-  }
+    $$('#text .w').forEach((el, j) => { const w = c.tokens[j]; el.classList.toggle('now', !!w && live && (heardJ !== null ? j === heardJ : t >= w.s && t < w.e + .04)); });
+  } catch (e) { console.error('karaoke', e); }
   requestAnimationFrame(tick);
 })();
 
@@ -344,7 +346,8 @@ async function approveAll() {
   } catch (e) { if (e.message !== 'login') toast('Not saved: ' + e.message); showApproveAll(); }
 }
 async function finished() {
-  stopAudio(); OV = await api('overview'); pill(OV); rail();
+  stopAudio(); $('#clipcard').innerHTML = '<div class="donebox"><p class="sub">Saving…</p></div>';
+  OV = await api('overview'); pill(OV); rail();
   $('#ok').hidden = $('#skip').hidden = $('#actbar').hidden = $('#approveall2').hidden = true; $('#clipno').textContent = 'Done'; $('#nextc').disabled = true; $('#prevc').disabled = false;
   const n = nextUp(OV, EX.category) || nextUp(OV);
   $('#clipcard').innerHTML = `<div class="donebox"><span class="st done" style="width:44px;height:44px;margin:0 auto;font-size:1.1rem">✓</span>
