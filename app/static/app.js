@@ -299,11 +299,12 @@ function text() {
     el.onpointerup = el.onpointercancel = () => { clearTimeout(lp); lp = null; };
     el.onclick = () => { const j = +el.dataset.j, now = Date.now();  // one tap: hear it; second tap (or a long press): open its card
       if (fired) { fired = false; return; }
-      if (brush) { if (tagOf(j) !== brush) { setLang(j, brush); navigator.vibrate?.(6); text(); save(); } return; }
+      if (brush) return;  // change-language mode: the press-and-drag below does the work
       if (lastTap.j === j && now - lastTap.t < 350) { lastTap = {}; openCard(j); } else { lastTap = {j, t: now}; hear(j); } };
   });
   $('#text').oncontextmenu = e => e.preventDefault();
-  const ch = toks.some((t, i) => mine(t, i));  // short labels on a phone so the header fits one row
+  paintDrag();
+  const ch =toks.some((t, i) => mine(t, i));  // short labels on a phone so the header fits one row
   $('#okl').textContent = phone() ? (ch ? 'Save' : 'Correct') : (ch ? 'Save & next clip' : 'Clip is correct');
   $('#aokl').textContent = ch ? 'Save' : 'Correct';
   $('#ticks').innerHTML = toks.map((t, i) => `<i class="${flagged(i) || mine(t, i) ? 'flag' : ''}" style="left:${t.s / C().dur * 100}%;height:${8 + ((t.t.length * 7) % 18)}px"></i>`).join('');
@@ -315,12 +316,33 @@ function text() {
     return h; }).filter(x => x != null).join(' ') + notes.map(n => `<span class="note">${n}</span>`).join('');
 }
 
+/* change-language mode: tap one word, or press on a word and drag to another; every word in between takes the language.
+   The run shows in the new colour while dragging and is saved on release. */
+let drag = null;
+function paintDrag() {
+  const box = $('#text'), on = !!brush;
+  const run = () => [Math.min(drag.a, drag.b), Math.max(drag.a, drag.b)];
+  const show = () => { const [a, b] = run();
+    $$('#text .w').forEach(el => { const j = +el.dataset.j, inr = j >= a && j <= b;
+      el.classList.remove('l-K', 'l-F', 'l-E', 'l-N'); el.classList.add('l-' + (inr ? brush : tagOf(j))); el.classList.toggle('pv', inr); }); };
+  box.onpointerdown = on ? e => { const el = e.target.closest('.w'); if (!el || e.button > 0) return;
+    e.preventDefault(); drag = {a: +el.dataset.j, b: +el.dataset.j}; box.setPointerCapture(e.pointerId); show(); } : null;
+  box.onpointermove = on ? e => { if (!drag) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('#text .w');
+    if (el && +el.dataset.j !== drag.b) { drag.b = +el.dataset.j; show(); } } : null;
+  box.onpointerup = on ? () => { if (!drag) return; const [a, b] = run(); drag = null; let n = 0;
+    for (let j = a; j <= b; j++) if (tagOf(j) !== brush) { setLang(j, brush); n++; }
+    if (n) { navigator.vibrate?.(6); save(); if (b > a) toast(`${b - a + 1} words: ${LGNAME[brush]}`); }
+    text(); } : null;
+  box.onpointercancel = on ? () => { drag = null; text(); } : null;
+}
+
 function lgbar(spells) {
   const n = {K: 0, F: 0, E: 0, N: 0}; C().tokens.forEach((t, i) => n[tagOf(i)]++);
   $('#lgbar').classList.toggle('paint', !!brush);
   $('#lgbar').innerHTML = `<span class="lgkeys">${'KFEN'.split('').map(l => `<button class="lgc l-${l} ${brush === l ? 'on' : ''}" data-l="${l}" ${brush ? '' : 'tabindex="-1"'}><i></i>${LGNAME[l] === 'Name or acronym' ? 'Name' : LGNAME[l]}${brush ? '' : ` <small>${n[l]}</small>`}</button>`).join('')}</span>
     <button class="lgfix" id="lgfix">${brush ? 'Done' : 'Change languages'}</button>
-    ${brush ? `<span class="lghint">Tap the words that are ${LGNAME[brush] === 'Name or acronym' ? 'names' : LGNAME[brush]}</span>`
+    ${brush ? `<span class="lghint">Tap a word, or press and drag across several, to make them ${LGNAME[brush] === 'Name or acronym' ? 'names' : LGNAME[brush]}</span>`
       : `<span class="lgextra"><span><u></u>Your change</span>${spells ? '<span><s></s>Spelling to check</span>' : ''}</span>`}`;
   $('#lgfix').onclick = () => { brush = brush ? null : 'F'; text(); };
   $$('#lgbar .lgc').forEach(b => b.onclick = () => { if (!brush) return; brush = b.dataset.l; text(); });

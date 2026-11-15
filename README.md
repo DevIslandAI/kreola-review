@@ -10,7 +10,7 @@ Works on a laptop and on a phone. Screens:
   and *Next recording* stay in that category.
 - **Review**: the clip plays and its words light up as they are spoken.
   - Every word is coloured by its language: **Kreol green, French blue, English red, name or acronym purple**.
-    To fix one, tap **Change languages** under the text, pick a colour, then tap the wrong words (*Done* to stop).
+    To fix one, tap **Change languages** under the text, pick a colour, then tap the wrong words, or press on a word and drag to another to change the whole run at once (*Done* to stop).
   - A Kreol word written the French way (*tout*, *avec*) has an orange wavy line; its card suggests the Kreol
     spelling (*tou*, *avek*) with one tap. The other way round for French words written the Kreol way.
   - **Not usable?** (top of each clip): Translated, Glitch / unrelated text, Can't hear or Music. The clip is kept

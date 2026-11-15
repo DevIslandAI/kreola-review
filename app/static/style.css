@@ -259,7 +259,9 @@ a.upnext:active{transform:scale(.985)}
 .l-K{--lc:var(--lK)}.l-F{--lc:var(--lF)}.l-E{--lc:var(--lE)}.l-N{--lc:var(--lN)}
 .w[class*="l-"]:not(.now):not(.gone):not(.sel){color:var(--lc)}
 .w.spell{text-decoration:underline wavy #D9932E 1.5px;text-underline-offset:6px}
+.text.painting{touch-action:none;user-select:none;-webkit-user-select:none}
 .text.painting .w{cursor:copy}
+.text.painting .w.pv{background:color-mix(in srgb,var(--lc) 16%,transparent);border-radius:4px}
 .text.painting .w:hover{background:color-mix(in srgb,var(--lc) 14%,transparent)}
 /* the bar under the text: colour key, change-language mode */
 .lgbar{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin-top:10px;font-size:.78rem;color:var(--ink3)}
