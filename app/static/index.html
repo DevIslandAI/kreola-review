@@ -36,6 +36,9 @@
   <div class="part">
     <label for="wcin">1 · Correct word</label>
     <div class="field main"><input id="wcin" autocomplete="off" spellcheck="false" placeholder="Type the right word(s)"></div>
+    <div class="spellhint" id="wcspell" hidden></div>
+    <div class="lgrow"><span class="lgcap">Language</span><div class="seg lgseg" id="wclang" role="radiogroup" aria-label="Language of this word">
+      <button type="button" data-l="K" title="Kreol">KM</button><button type="button" data-l="F" title="French">FR</button><button type="button" data-l="E" title="English">EN</button><button type="button" data-l="N" title="Name or acronym">NE</button></div></div>
   </div>
 
   <div class="part">
@@ -53,6 +56,12 @@
 
   <button class="rm" id="wcrm">Remove this word (not said)</button>
   <div class="row"><button class="btn ghost" id="wccancel">Cancel</button><button class="btn primary" id="wcsave">Save</button></div>
+</div>
+
+<div class="wc nusheet" id="nu" role="dialog" aria-label="Not usable">
+  <div class="top2"><div><b>Not usable</b><br><small>The clip is kept, but left out of training. Why?</small></div><button class="x" id="nux" aria-label="Close" style="margin-left:auto">✕</button></div>
+  <div class="nulist" id="nulist"></div>
+  <button class="rm" id="nuundo" hidden>It is usable after all</button>
 </div>
 
 <div class="toast" id="toast"><span class="ok">✓</span><span id="toastT"></span></div>

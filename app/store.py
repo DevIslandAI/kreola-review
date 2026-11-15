@@ -44,8 +44,9 @@ def q(sql, args=(), one=False):
 
 
 def save_clip(clip_id, excerpt_id, verdict, edits, why, note, seconds):
+    """verdict None keeps the clip's verdict; "" clears it (back to "to review")."""
     q("""insert into clips(clip_id, excerpt_id, verdict, edits, why, note, seconds, updated_at) values(?,?,?,?,?,?,?,?)
-         on conflict(clip_id) do update set verdict=coalesce(excluded.verdict, clips.verdict), edits=excluded.edits,
+         on conflict(clip_id) do update set verdict=nullif(coalesce(excluded.verdict, clips.verdict), ''), edits=excluded.edits,
          why=excluded.why, note=excluded.note, seconds=clips.seconds+excluded.seconds, updated_at=excluded.updated_at""",
       (clip_id, excerpt_id, verdict, json.dumps(edits, ensure_ascii=False), json.dumps(why, ensure_ascii=False), note, seconds, time.time()))
 

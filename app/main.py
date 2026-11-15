@@ -22,6 +22,17 @@ bootstrap.ensure_data()  # a new server fetches the review set and audio from Hu
 SET = json.loads((DATA_DIR / "review_set.json").read_text(encoding="utf-8"))
 EXCERPTS = {e["id"]: e for e in SET["excerpts"]}
 CLIPS = {c["clip_id"]: (e, c) for e in SET["excerpts"] for c in e["clips"]}
+# the language of every word (K Kreol, F French, E English, N name): tools/tag_languages.py; the reviewer can change it
+_TAGS = ROOT / "data" / "word_tags.json"
+TAGS = json.loads(_TAGS.read_text(encoding="utf-8")) if _TAGS.exists() else {}
+LEXICON = json.loads((ROOT / "data" / "lexicon.json").read_text(encoding="utf-8"))  # tools/build_lexicon.py
+FIRST = {"mfe_Latn": "K", "fra_Latn": "F", "eng_Latn": "E"}
+TRAIN = ("ok", "fixed")  # verdicts whose text goes into training; "skip" and "unusable" stay out
+
+
+def auto_tags(c):
+    t = TAGS.get(c["clip_id"], "")
+    return t if len(t) == len(c["tokens"]) else FIRST.get(c["language"], "K") * len(c["tokens"])
 
 app = FastAPI(title="Kreola Review", docs_url=None, redoc_url=None)
 
@@ -57,15 +68,19 @@ def login(body: Login, request: Request):
     raise HTTPException(401, "Wrong password")
 
 
-def final_words(clip, state):
-    """The clip's text as the reviewer left it: their edits, else the clean-up's fix, else myt's word."""
+def final_words(clip, state, tags=False):
+    """The clip's text as the reviewer left it: their edits, else the clean-up's fix, else myt's word.
+    With tags=True, also one language letter per final word (a word typed as two gets its letter twice)."""
     edits = (state or {}).get("edits", {})
-    out = []
+    auto = auto_tags(clip)
+    out, langs = [], []
     for i, t in enumerate(clip["tokens"]):
         e = edits.get(str(i), {})
         if not e.get("gone"):
-            out.append(e.get("show") or t.get("auto") or t["t"])
-    return out
+            w = e.get("show") or t.get("auto") or t["t"]
+            out.append(w)
+            langs.append((e.get("lang") or auto[i]) * len(w.split()))
+    return (out, "".join(langs)) if tags else out
 
 
 @app.get("/api/overview")
@@ -110,7 +125,13 @@ def excerpt(eid: str):
                      [c["clip_id"] for c in e["clips"]]):
         notes[v["clip_id"]].append(v)
     return {**{k: v for k, v in e.items() if k != "clips"},
-            "clips": [{**c, "state": states.get(c["clip_id"]), "voice": notes[c["clip_id"]]} for c in e["clips"]]}
+            "clips": [{**c, "tags": auto_tags(c), "state": states.get(c["clip_id"]), "voice": notes[c["clip_id"]]} for c in e["clips"]]}
+
+
+@app.get("/api/lexicon")
+def lexicon():
+    """Spelling pairs for the spelling check: km = French or wrong spelling -> Kreol, fr = Kreol -> French."""
+    return LEXICON
 
 
 @app.get("/api/audio/{eid}")
@@ -122,8 +143,8 @@ def audio(eid: str):
 
 
 class ClipState(BaseModel):
-    verdict: str | None = None  # ok | fixed | skip
-    edits: dict = {}            # word position -> {show, gone, why[], note}
+    verdict: str | None = None  # ok | fixed | skip | unusable (kept, but left out of training)
+    edits: dict = {}            # word position -> {show, gone, why[], note, lang}
     why: list = []              # reasons for the whole clip
     note: str = ""
     seconds: float = 0
@@ -133,6 +154,8 @@ class ClipState(BaseModel):
 def put_clip(clip_id: str, s: ClipState):
     if clip_id not in CLIPS:
         raise HTTPException(404)
+    if s.verdict not in (None, "", "ok", "fixed", "skip", "unusable"):
+        raise HTTPException(400)
     store.save_clip(clip_id, CLIPS[clip_id][0]["id"], s.verdict, s.edits, s.why, s.note, max(0, min(s.seconds, 3600)))
     return {"ok": True}
 
@@ -201,15 +224,17 @@ def get_voice(vid: int):
 
 @app.get("/api/export", response_class=PlainTextResponse)
 def export():
-    """One JSON line per reviewed clip: final text, verdict, reasons, comments, voice-note transcripts, teach/exam."""
+    """One JSON line per reviewed clip: final text and its word languages, verdict (train = goes into training),
+    reasons, comments, voice-note transcripts, teach/exam."""
     states, lines = store.clip_states(), []
     notes = defaultdict(list)
     for v in store.q("select clip_id, word, transcript from voice"):
         notes[v["clip_id"]].append(v)
     for cid, s in states.items():
         e, c = CLIPS[cid]
+        words, langs = final_words(c, s, tags=True)
         lines.append(json.dumps({"clip_id": cid, "excerpt_id": e["id"], "split": e["split"], "verdict": s["verdict"],
-                                 "text": " ".join(final_words(c, s)), "myt_text": " ".join(t["t"] for t in c["tokens"]),
+                                 "train": s["verdict"] in TRAIN, "text": " ".join(words), "word_langs": langs, "myt_text": " ".join(t["t"] for t in c["tokens"]),
                                  "edits": s["edits"], "clip_reasons": s["why"], "clip_note": s["note"],
                                  "voice_notes": notes[cid], "seconds": s["seconds"], "updated_at": s["updated_at"]}, ensure_ascii=False))
     return "\n".join(lines) + "\n"

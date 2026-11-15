@@ -11,6 +11,12 @@ const nice = s => { s = String(s).replace(/_/g, ' '); return s[0].toUpperCase() 
 const langs = e => ['mfe_Latn', 'fra_Latn', 'eng_Latn'].filter(l => (e.languages || [e.language]).includes(l)).map(l => LANG[l]).join(' + ');
 const WORD_WHY = ['Misheard', 'Spelling', 'Can’t hear', 'Wrong language', 'Timing off'];
 const CLIP_WHY = ['Can’t hear', 'Timing off', 'Wrong language', 'Music behind', 'Several speakers'];
+/* not usable: the clip is kept but left out of training, with one of these reasons */
+const NU_WHY = [['Translated', 'The text is in another language than the audio'], ['Glitch / unrelated text', 'The text has nothing to do with what is said'],
+  ['Can’t hear', 'Too noisy, too quiet or cut off'], ['Music', 'Music or singing covers the voice']];
+/* word languages: K Kreol, F French, E English, N name or acronym (auto-tagged, the reviewer has the last word) */
+const LG = {K: 'KM', F: 'FR', E: 'EN', N: 'NE'}, LGNAME = {K: 'Kreol', F: 'French', E: 'English', N: 'Name or acronym'};
+let LEX = {km: {}, fr: {}};  // spelling pairs: km = French or wrong spelling -> Kreol, fr = Kreol -> French
 
 async function api(path, opt = {}) {
   const r = await fetch('api/' + path, {headers: opt.body && !(opt.body instanceof FormData) ? {'Content-Type': 'application/json'} : {}, ...opt,
@@ -170,6 +176,22 @@ const wordVoice = i => C().voice.filter(v => v.word === i);
 const flagged = i => { const e = S().edits[i] || {}; return (e.why || []).length || e.note || wordVoice(i).length; };
 const touched = c => c.state && (Object.keys(c.state.edits || {}).length || (c.state.why || []).length || c.state.note);
 const mine = (t, i) => { const e = S().edits[i] || {}; return e.gone || (e.show != null && e.show !== (t.auto ?? t.t)); };
+const tagOf = i => (S().edits[i] || {}).lang || (C().tags || '')[i] || 'K';
+/* change languages: pick a language, then each tapped word takes it (null = off, taps play words as usual) */
+let brush = null;
+function setLang(i, l) {
+  const e = {...(S().edits[i] || {})};
+  if (l === ((C().tags || '')[i] || 'K')) delete e.lang; else e.lang = l;
+  if (Object.keys(e).length) S().edits[i] = e; else delete S().edits[i];
+}
+/* spelling check: a Kreol word written the French way (or a French word written the Kreol way) -> the right spelling */
+function spellFix(word, lg) {
+  word = (word || '').trim();
+  if (!word || /\s/.test(word)) return null;
+  const m = word.match(/^([^\p{L}\p{N}']*)(.*?)([^\p{L}\p{N}']*)$/u), core = m[2].toLowerCase().replace(/’/g, "'");
+  const to = (lg === 'K' ? LEX.km : lg === 'F' ? LEX.fr : {})[core];
+  return to ? m[1] + (/^\p{Lu}/u.test(m[2]) ? to[0].toUpperCase() + to.slice(1) : to) + m[3] : null;
+}
 
 async function review(id, start) {
   EX = null; cur = 0;
@@ -213,13 +235,13 @@ async function review(id, start) {
   $('#autop').classList.toggle('on', autoplay()); $('#autop').setAttribute('aria-checked', autoplay());
   $('#autop').onclick = () => { const on = !autoplay(); try { localStorage.setItem('kreola.autoplay', on ? '1' : '0'); } catch (e) {} $('#autop').classList.toggle('on', on); $('#autop').setAttribute('aria-checked', on); toast(on ? 'Auto-play on: after you save, the next clip plays by itself' : 'Auto-play off: press Play for each clip'); };
   holdToTalk($('#holdmic'));
-  seen = new Set(); $('#approveall').onclick = $('#approveall2').onclick = approveAll;
+  brush = null; seen = new Set(); $('#approveall').onclick = $('#approveall2').onclick = approveAll;
   $('#prevc').onclick = () => cur > 0 && load(cur - 1); $('#nextc').onclick = () => cur < EX.clips.length - 1 && load(cur + 1);
   load(cur);
 }
 function rail() {
   $('#rail').innerHTML = EX.clips.map((c, i) => { const v = c.state?.verdict; return `<button class="c ${i === cur ? 'on' : ''}" data-i="${i}">
-    <span class="st ${v ? 'done' : touched(c) ? 'half' : ''}">${v ? '✓' : ''}</span><span>Clip ${i + 1}<small>${fmt(c.offset)} · ${v ? {ok: 'Correct', fixed: 'Fixed', skip: 'Skipped'}[v] : 'To review'}</small></span></button>`; }).join('');
+    <span class="st ${v === 'unusable' ? 'nu' : v ? 'done' : touched(c) ? 'half' : ''}">${v === 'unusable' ? '✕' : v ? '✓' : ''}</span><span>Clip ${i + 1}<small>${fmt(c.offset)} · ${v ? {ok: 'Correct', fixed: 'Fixed', skip: 'Skipped', unusable: 'Not usable'}[v] : 'To review'}</small></span></button>`; }).join('');
   $$('#rail .c').forEach(b => b.onclick = () => load(+b.dataset.i));
   $('#rail .c.on')?.scrollIntoView({block: 'nearest', inline: 'nearest'});
 }
@@ -229,12 +251,12 @@ function load(i) {
   if (i >= EX.clips.length) return finished();
   $('#clipcard').innerHTML = `
     <div class="extitle" title="${esc(EX.title)}"><span class="et">${esc(EX.title)}</span>
-      <span class="meta"><span>${nice(EX.category)}</span><i></i><span>${fmt(EX.duration)}</span><i></i><span><span class="dot ${EX.difficulty}"></span>${DIFF[EX.difficulty]}</span><i></i><span>${langs(EX)}</span></span></div>
+      <span class="meta"><span>${nice(EX.category)}</span><i></i><span>${fmt(EX.duration)}</span><i></i><span><span class="dot ${EX.difficulty}"></span>${DIFF[EX.difficulty]}</span><i></i><span>${langs(EX)}</span><button class="nubtn" id="nubtn"></button></span></div>
     <div class="player"><button class="play" id="play" aria-label="Play clip"><svg id="pi" width="20" height="20" viewBox="0 0 20 20"><path d="M6 3.5v13l11-6.5z" fill="currentColor"/></svg></button>
       <div class="track"><div class="scrub" id="scrub"><div id="ticks"></div><div class="hl" id="hl"></div></div><div class="times"><span id="tcur">0:00</span><span>${fmt(C().dur)}</span></div></div>
       <div class="speed" id="speed"><button data-r=".75">0.75×</button><button data-r="1" class="on">1×</button></div></div>
     <div class="text" id="text"></div>
-    <div class="howto"><span class="legend3"><span><u></u>Your change</span></span></div>
+    <div class="lgbar" id="lgbar"></div>
     <div class="sect"><h3>Comment on the whole clip</h3><div class="chips" id="clipchips"></div>
       <div class="field" style="margin-top:12px"><input id="clipnote" placeholder="Anything about this clip"><button class="mic" id="clipmic" title="Record a voice note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button></div>
       <div id="clipvoice"></div></div>
@@ -248,6 +270,7 @@ function load(i) {
   $$('#clipchips .chip').forEach(b => b.onclick = () => { const w = S().why, k = w.indexOf(b.textContent); k < 0 ? w.push(b.textContent) : w.splice(k, 1); b.classList.toggle('on'); save(); });
   $('#clipnote').value = S().note || '';
   $('#clipnote').oninput = e => { S().note = e.target.value; clearTimeout(load.t); load.t = setTimeout(save, 700); };
+  $('#nubtn').onclick = openNu;
   $('#clipmic').onclick = () => record($('#clipmic'), null, () => voiceList($('#clipvoice'), C().voice.filter(v => v.word == null)));
   voiceList($('#clipvoice'), C().voice.filter(v => v.word == null));
   $('#clipno').innerHTML = `<span class="cw">Clip ${cur + 1} of ${EX.clips.length}</span><span class="cs">${cur + 1}/${EX.clips.length}</span>`; $('#prevc').disabled = cur === 0; $('#nextc').disabled = cur === EX.clips.length - 1; $('#aprev').disabled = cur === 0; $('#anext').disabled = cur === EX.clips.length - 1;
@@ -259,16 +282,24 @@ function load(i) {
 }
 function text() {
   const toks = C().tokens;
-  $('#text').innerHTML = toks.map((t, i) => { const e = S().edits[i] || {};
-    const cls = e.gone ? 'gone' : mine(t, i) ? 'mine' : '';
-    return `<span class="w ${cls}${flagged(i) ? ' flagged' : ''}" data-j="${i}">${esc(shown_(t, i))}</span>`; }).join(' ');
+  let spells = 0;  // every word in the colour of its language; a wavy line = spelling to check
+  $('#text').classList.toggle('painting', !!brush);
+  $('#text').innerHTML = toks.map((t, i) => { const e = S().edits[i] || {}, lg = tagOf(i);
+    const cls = e.gone ? 'gone' : mine(t, i) ? 'mine' : '', sp = !e.gone && spellFix(shown_(t, i), lg);
+    spells += !!sp;
+    return `<span class="w l-${lg} ${cls}${flagged(i) ? ' flagged' : ''}${sp ? ' spell' : ''}" data-j="${i}" title="${LGNAME[lg]}">${esc(shown_(t, i))}</span>`; }).join(' ');
+  lgbar(spells);
+  const nu = S().verdict === 'unusable', nr = NU_WHY.find(([r]) => S().why.includes(r));
+  $('#clipcard').classList.toggle('isnu', nu);
+  $('#nubtn').classList.toggle('on', nu); $('#nubtn').textContent = nu ? `Not usable${nr ? ' · ' + nr[0] : ''}` : 'Not usable?';
   $$('#text .w').forEach(el => {
     let lp = null, fired = false, x0 = 0, y0 = 0;
-    el.onpointerdown = e => { fired = false; x0 = e.clientX; y0 = e.clientY; if (e.pointerType !== 'mouse') lp = setTimeout(() => { fired = true; navigator.vibrate?.(8); openCard(+el.dataset.j); }, 450); };
+    el.onpointerdown = e => { fired = false; x0 = e.clientX; y0 = e.clientY; if (e.pointerType !== 'mouse' && !brush) lp = setTimeout(() => { fired = true; navigator.vibrate?.(8); openCard(+el.dataset.j); }, 450); };
     el.onpointermove = e => { if (lp && Math.hypot(e.clientX - x0, e.clientY - y0) > 10) { clearTimeout(lp); lp = null; } };
     el.onpointerup = el.onpointercancel = () => { clearTimeout(lp); lp = null; };
     el.onclick = () => { const j = +el.dataset.j, now = Date.now();  // one tap: hear it; second tap (or a long press): open its card
       if (fired) { fired = false; return; }
+      if (brush) { if (tagOf(j) !== brush) { setLang(j, brush); navigator.vibrate?.(6); text(); save(); } return; }
       if (lastTap.j === j && now - lastTap.t < 350) { lastTap = {}; openCard(j); } else { lastTap = {j, t: now}; hear(j); } };
   });
   $('#text').oncontextmenu = e => e.preventDefault();
@@ -282,6 +313,17 @@ function text() {
     let h = mine(t, i) || t.auto ? `<span class="now2">${esc(shown_(t, i))}</span>` : esc(shown_(t, i));
     if (flagged(i)) { h = `<span class="fl">${h}</span>`; notes.push(`<b>${esc(shown_(t, i))}</b>: ${esc([...(e.why || []), ...(e.note ? [e.note] : []), ...wordVoice(i).map(v => `voice: “${v.transcript || '…'}”`)].join(' · '))}`); }
     return h; }).filter(x => x != null).join(' ') + notes.map(n => `<span class="note">${n}</span>`).join('');
+}
+
+function lgbar(spells) {
+  const n = {K: 0, F: 0, E: 0, N: 0}; C().tokens.forEach((t, i) => n[tagOf(i)]++);
+  $('#lgbar').classList.toggle('paint', !!brush);
+  $('#lgbar').innerHTML = `<span class="lgkeys">${'KFEN'.split('').map(l => `<button class="lgc l-${l} ${brush === l ? 'on' : ''}" data-l="${l}" ${brush ? '' : 'tabindex="-1"'}><i></i>${LGNAME[l] === 'Name or acronym' ? 'Name' : LGNAME[l]}${brush ? '' : ` <small>${n[l]}</small>`}</button>`).join('')}</span>
+    <button class="lgfix" id="lgfix">${brush ? 'Done' : 'Change languages'}</button>
+    ${brush ? `<span class="lghint">Tap the words that are ${LGNAME[brush] === 'Name or acronym' ? 'names' : LGNAME[brush]}</span>`
+      : `<span class="lgextra"><span><u></u>Your change</span>${spells ? '<span><s></s>Spelling to check</span>' : ''}</span>`}`;
+  $('#lgfix').onclick = () => { brush = brush ? null : 'F'; text(); };
+  $$('#lgbar .lgc').forEach(b => b.onclick = () => { if (!brush) return; brush = b.dataset.l; text(); });
 }
 
 /* audio: a clip plays between its own start and end; a tapped word plays alone */
@@ -306,14 +348,14 @@ audio.ontimeupdate = () => { if (stopAt !== null && audio.currentTime >= stopAt)
 /* saving: every change is sent at once; time spent goes with it */
 function flushTime() { const s = (Date.now() - clipT0) / 1000; clipT0 = Date.now(); return Math.min(s, 600); }
 async function save(v) {
-  const s = S(); if (v) s.verdict = v;
-  try { await api('clip/' + C().clip_id, {method: 'PUT', body: {verdict: v || null, edits: s.edits, why: s.why, note: s.note || '', seconds: flushTime()}}); }
+  const s = S(); if (v != null) s.verdict = v || null;  // v: a verdict; "" = back to To review; nothing = keep it
+  try { await api('clip/' + C().clip_id, {method: 'PUT', body: {verdict: v ?? null, edits: s.edits, why: s.why, note: s.note || '', seconds: flushTime()}}); }
   catch (e) { if (e.message !== 'login') toast('Not saved: ' + e.message); }
 }
 async function verdict(v) {
   const s = S(); v = v || (C().tokens.some((t, i) => mine(t, i)) ? 'fixed' : 'ok');
   await save(v);
-  const said = {ok: 'Marked correct', fixed: 'Fixes saved', skip: 'Skipped for now'}[v] + ` · clip ${cur + 1}`;
+  const said = {ok: 'Marked correct', fixed: 'Fixes saved', skip: 'Skipped for now', unusable: 'Marked not usable'}[v] + ` · clip ${cur + 1}`;
   navigator.vibrate?.(12);
   OV = null; load(cur + 1);
   if (autoplay() && cur < EX.clips.length) { playClip(); toast(`${said} · now playing clip ${cur + 1}`); } else toast(said);
@@ -355,14 +397,35 @@ async function finished() {
     <div style="display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap"><a class="btn ghost" href="#/c/${encodeURIComponent(EX.category)}">${nice(EX.category)}</a>${n ? `<a class="btn primary" href="#/r/${encodeURIComponent(n.id)}">Next recording${n.category !== EX.category ? ` · ${nice(n.category)}` : ''} →</a>` : ''}</div></div>`;
 }
 
-/* ───── word card: 1 correct, 2 translate, 3 comment ───── */
+/* not usable: a popover under the button on a laptop, a bottom sheet on a phone */
+function openNu() {
+  closeCard();
+  const nu = S().verdict === 'unusable';
+  $('#nulist').innerHTML = NU_WHY.map(([r, d]) => `<button class="${nu && S().why.includes(r) ? 'on' : ''}" data-r="${esc(r)}"><b>${esc(r)}</b><small>${esc(d)}</small></button>`).join('');
+  $$('#nulist button').forEach(b => b.onclick = () => {
+    const w = S().why; NU_WHY.forEach(([r]) => { const k = w.indexOf(r); if (k >= 0) w.splice(k, 1); }); w.push(b.dataset.r);
+    closeNu(); verdict('unusable');
+  });
+  $('#nuundo').hidden = !nu;
+  const box = $('#nu');
+  if (!phone()) { const r = $('#nubtn').getBoundingClientRect(), W = 360;
+    box.style.left = Math.max(12, Math.min(innerWidth - W - 12, r.right - W)) + 'px'; box.style.top = r.bottom + 8 + scrollY + 'px'; box.style.transformOrigin = 'top right'; }
+  box.classList.add('on'); $('#scrim').classList.add('on');
+}
+function closeNu() { $('#nu').classList.remove('on'); if (!$('#wc').classList.contains('on')) $('#scrim').classList.remove('on'); }
+$('#nux').onclick = closeNu;
+$('#nuundo').onclick = async () => { const w = S().why; NU_WHY.forEach(([r]) => { const k = w.indexOf(r); if (k >= 0) w.splice(k, 1); });
+  closeNu(); await save(''); rail(); text(); toast('Back to To review'); };
+
+/* ───── word card: 1 correct (with its language and spelling), 2 translate, 3 comment ───── */
 let cj = null, draft = null;
 function openCard(j) {
   const t = C().tokens[j], e = S().edits[j] || {};
-  cj = j; draft = {why: [...(e.why || [])], gone: !!e.gone};
+  cj = j; draft = {why: [...(e.why || [])], gone: !!e.gone, lang: tagOf(j)};
+  $$('#wclang button').forEach(b => b.classList.toggle('on', b.dataset.l === draft.lang));
   $$('#text .w').forEach(el => el.classList.toggle('sel', +el.dataset.j === j));
   $('#wcword').textContent = t.t; $('#wcwhen').textContent = `myt wrote this · at ${fmt(C().offset + t.s)}`;
-  $('#wcin').value = shown_(t, j); $('#wcnote').value = e.note || '';
+  $('#wcin').value = shown_(t, j); $('#wcnote').value = e.note || ''; spellHint();
   cardTr.reset();
   trOpen(trOpen());
   $('#wcchips').innerHTML = WORD_WHY.map(w => `<button class="chip ${draft.why.includes(w) ? 'on' : ''}">${w}</button>`).join('');
@@ -383,14 +446,23 @@ function openCard(j) {
   setTimeout(() => { $('#wcin').focus(); $('#wcin').select(); }, 60);
   hear(j);
 }
-function closeCard() { $('#wc').classList.remove('on'); $('#scrim').classList.remove('on'); $$('#text .w.sel').forEach(el => el.classList.remove('sel')); cj = null; if (rec?.state === 'recording') rec.stop(); }
+function spellHint() {
+  const fix = spellFix($('#wcin').value, draft.lang), box = $('#wcspell');
+  box.hidden = !fix || fix === $('#wcin').value.trim();
+  if (!box.hidden) box.innerHTML = `<span>${LGNAME[draft.lang]} spelling: <b>${esc(fix)}</b></span><button class="btn small" type="button">Use it</button>`;
+  if (!box.hidden) box.querySelector('button').onclick = () => { $('#wcin').value = fix; spellHint(); $('#wcin').focus(); };
+}
+$('#wcin').oninput = spellHint;
+$$('#wclang button').forEach(b => b.onclick = () => { draft.lang = b.dataset.l; $$('#wclang button').forEach(x => x.classList.toggle('on', x === b)); spellHint(); });
+function closeCard() { $('#wc').classList.remove('on'); $('#nu')?.classList.remove('on'); $('#scrim').classList.remove('on'); $$('#text .w.sel').forEach(el => el.classList.remove('sel')); cj = null; if (rec?.state === 'recording') rec.stop(); }
 function saveCard() {
   const t = C().tokens[cj], v = $('#wcin').value.trim().replace(/\s+/g, ' '), e = {};
   if (draft.gone || !v) e.gone = true; else if (v !== (t.auto ?? t.t)) e.show = v;
   if (draft.why.length) e.why = draft.why;
+  if (draft.lang !== ((C().tags || '')[cj] || 'K')) e.lang = draft.lang;
   if ($('#wcnote').value.trim()) e.note = $('#wcnote').value.trim();
   if (Object.keys(e).length) S().edits[cj] = e; else delete S().edits[cj];
-  const said = e.gone ? 'Word removed' : e.show ? 'Fix saved' : (e.why || e.note) ? 'Comment saved' : 'No change';
+  const said = e.gone ? 'Word removed' : e.show ? 'Fix saved' : (e.why || e.note) ? 'Comment saved' : e.lang ? `Language: ${LGNAME[e.lang]}` : 'No change';
   closeCard(); text(); save(); toast(said);
 }
 $('#wcin').onkeydown = $('#wcnote').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); saveCard(); } if (e.key === 'Escape') closeCard(); };
@@ -537,5 +609,6 @@ async function start() {
   const me = await api('me');
   if (!me.ok) return login();
   $('#top').hidden = false; route();
+  api('lexicon').then(x => { LEX = x; if (EX && $('#text')) text(); }).catch(() => {});
 }
 start();

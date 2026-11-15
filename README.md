@@ -9,9 +9,16 @@ Works on a laptop and on a phone. Screens:
   grouped by family, each with its progress). A category page lists its recordings with clips done, and *Start / Continue*
   and *Next recording* stay in that category.
 - **Review**: the clip plays and its words light up as they are spoken.
+  - Every word is coloured by its language: **Kreol green, French blue, English red, name or acronym purple**.
+    To fix one, tap **Change languages** under the text, pick a colour, then tap the wrong words (*Done* to stop).
+  - A Kreol word written the French way (*tout*, *avec*) has an orange wavy line; its card suggests the Kreol
+    spelling (*tou*, *avek*) with one tap. The other way round for French words written the Kreol way.
+  - **Not usable?** (top of each clip): Translated, Glitch / unrelated text, Can't hear or Music. The clip is kept
+    but left out of training.
   - Click a word to hear only that word.
   - Double-click a word to open its card:
-    1. **Correct word**: type the right word(s), or remove a word that was never said.
+    1. **Correct word**: type the right word(s), or remove a word that was never said. Its language (KM, FR, EN, NE)
+       can be changed here too.
     2. **Translate / Find a word**: say which language you write in (Kreol, French or English).
        - *Translate* gives the word in the language you choose, on the right, with a ⇄ swap button.
        - *Find* searches within your own language: input that is misspelled, written as it sounds, or a meaning.
@@ -46,6 +53,8 @@ Every change is saved on the server as you go.
 | `app/data/rules.md` | the project spelling rules v1.0 (given to Claude with every search) |
 | `tools/build_review_set.py` | chooses the 10 h and cuts their audio (run once, on the PC with the dataset) |
 | `tools/build_dictionary.py` | rebuilds the dictionary from the vocabulary sheet |
+| `tools/tag_languages.py` | tags the language of every word -> `app/data/word_tags.json` (`--rules-only`: free; without it, Claude re-checks the mixed clips, about $6) |
+| `tools/build_lexicon.py` | the French / Kreol spelling pairs for the spelling check -> `app/data/lexicon.json` |
 
 **Review data never goes to git.** It lives in `DATA_DIR`: `review_set.json`, `audio/` (~210 MB), and `reviews.db` +
 `voice/` (your work). On the laptop that is `../kreola-data/00_review/platform/data`; on the server, the `/data` volume.
